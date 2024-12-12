@@ -40,17 +40,14 @@ uint16_t get_pixel(float u, float v, float col)
 {
   float length = sqrt(pow(u*2.0-1.0, 2.0)+pow(v*2.0-1.0, 2.0));
   length -= 1.0;
-  if(length < 0.0)
+  if(length < 0.01)
   {
-    return rgb888_to_rgb565(col*255, 0, 0);
+    return rgb888_to_rgb565(col*255, col*255, col*255);
   }
   else
   {
     return rgb888_to_rgb565(0, 0, 0);
   }
-
-  // length = length/0.1;
-  
 }
 
 void app_main(void) 
@@ -66,7 +63,6 @@ void app_main(void)
       .quadwp_io_num = -1,
       .quadhd_io_num = -1,
       .max_transfer_sz = LCD_H_RES * 80 * sizeof(uint16_t),
-      
     };
 
     // Initialize the SPI bus
@@ -107,52 +103,45 @@ void app_main(void)
     gpio_set_level(PIN_NUM_BK_LIGHT, 1);
 
 
-    static uint16_t black_bitmap[LCD_H_RES * LCD_V_RES];
-    
-    // esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, NULL); 
-    uint16_t black  = rgb888_to_rgb565(0, 0, 0);
-
-    for (int i = 0; i < LCD_H_RES*LCD_V_RES; i++) {
-      black_bitmap[i] = black;
-    //   if(i%LCD_H_RES <80)
-    //   {
-    //     bitmap[i] = red;
-    //   }
-    //   else
-    //   {
-    //     if(i%LCD_H_RES <160)
-    //     {
-    //       bitmap[i] = green;
-    //     }
-    //     else
-    //     {
-    //       bitmap[i] = blue;
-    //     }
-    //   }
-    }
+    uint16_t black  = 0b0000000000000000;
+    uint16_t red    = 0b1111100000000000;
+    uint16_t green  = 0b0000011111100000;
+    uint16_t blue   = 0b0000000000011111;
 
 
 
-    // esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, NULL);
 
+    uint16_t *full_screen_bitmap = (uint16_t *)heap_caps_malloc(sizeof(uint16_t) * LCD_H_RES * LCD_V_RES, MALLOC_CAP_DMA);
     uint16_t *bitmap_dma = (uint16_t *)heap_caps_malloc(sizeof(uint16_t) * 10 * 10, MALLOC_CAP_DMA);
     if (bitmap_dma == NULL) {
       ESP_LOGE("DMA_ALLOC", "Failed to allocate memory for the bitmap");
       return;
     }
 
-    
+    for (int i = 0; i < LCD_H_RES*LCD_V_RES; i++) {
+      full_screen_bitmap[i] = black;
 
-
-    // const TickType_t xDelay = pdMS_TO_TICKS(1000 / 60);
+      if(i%LCD_H_RES <80)
+      {
+        full_screen_bitmap[i] = (red >> 8) | ((red & 0xFF) << 8);
+      }
+      else
+      {
+        if(i%LCD_H_RES <160)
+        {
+          full_screen_bitmap[i] = (green >> 8) | ((green & 0xFF) << 8);
+        }
+        else
+        {
+          full_screen_bitmap[i] = (blue >> 8) | ((blue & 0xFF) << 8);
+        }
+      }
+    }
 
     float previous_elapsed_time = esp_timer_get_time()/1000.0/1000.0;
     float accum_time = 0.0;
 
-    ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, black_bitmap));
-
-
-    // ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 120, 120, 130, 130, bitmap_dma));
+    ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
     while (true) 
     {
       float elapsed_time = esp_timer_get_time()/1000.0/1000.0;
@@ -165,28 +154,12 @@ void app_main(void)
 
         float col = sin(elapsed_time*2)*0.5+0.5;
 
-        // uint16_t color = rgb888_to_rgb565((uint8_t)(col*255), 0, 0);
-        // uint8_t color_high = (color >> 8) & 0xFF;
-        // uint8_t color_low = color & 0xFF;
-
         for (int i = 0; i < 10*10; i++) {
           float x = i%10;
           float y = floor(i/10.0);
 
-          uint16_t color = get_pixel(x/10.0,y/10.0, col);
-          bitmap_dma[i] = (color>>8) | (color<<8);
-
-          // uint8_t color_high = (color >> 8) & 0xFF;
-          // uint8_t color_low = color & 0xFF;
-          // bitmap_dma[i*2+0] = color_high; 
-          // bitmap_dma[i*2+1] = color_low;
-
-                                               // a        a+1
-          // bitmap_dma[i] = 0b1111100000000000; // 00000111 11100000
-          // bitmap_dma[i] = 0b0000000000011111;
-          // uint16_t test = 0b1111100000000000;
-          // bitmap_dma[i] = test;
-          // bitmap_dma[i] = (test>>8) | (test<<8);
+          uint16_t color = get_pixel(x/9.0,y/9.0, col);
+          bitmap_dma[i] = (color >> 8) | ((color & 0xFF) << 8);
         }
 
         ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 115, 115, 125, 125, bitmap_dma));
