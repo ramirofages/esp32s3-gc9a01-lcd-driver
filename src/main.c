@@ -24,9 +24,22 @@
 
 #define LCD_H_RES              240
 #define LCD_V_RES              240
-
+#define LCD_RES 240*240
 #define LCD_CMD_BITS           8
 #define LCD_PARAM_BITS         8
+
+typedef struct {
+    float x;
+    float y;
+} vec2_t;
+
+// Function to create a vec2_t
+vec2_t create_vec2(float x, float y) {
+    vec2_t v;
+    v.x = x;
+    v.y = y;
+    return v;
+}
 
 uint16_t rgb888_to_rgb565(uint8_t red, uint8_t green, uint8_t blue) {
     uint16_t r = (red >> 3) & 0x1F;    // 5 bits for red
@@ -36,23 +49,43 @@ uint16_t rgb888_to_rgb565(uint8_t red, uint8_t green, uint8_t blue) {
     return (r << 11) | (g << 5) | b;   // Combine into RGB565
 }
 
-uint16_t get_pixel(float u, float v, float col)
+
+#define SINE_TABLE_SIZE 360
+static float sine_table[SINE_TABLE_SIZE];
+
+void initialize_sine_table() {
+    for (int i = 0; i < SINE_TABLE_SIZE; i++) {
+        sine_table[i] = sinf((i/359.0f)* 6.283164f);
+    }
+}
+
+float fast_sine_01(float t)
 {
-  float length = sqrt(pow(u*2.0-1.0, 2.0)+pow(v*2.0-1.0, 2.0));
-  length -= 1.0;
-  if(length < 0.01)
-  {
-    return rgb888_to_rgb565(col*255, col*255, col*255);
-  }
-  else
-  {
-    return rgb888_to_rgb565(0, 0, 0);
-  }
+  return sine_table[(int)(t*359)];
+}
+// float fast_sine(float angle) {
+//     int index = ((int)angle) % SINE_TABLE_SIZE;
+//     if (index < 0) index += SINE_TABLE_SIZE; // Handle negative angles
+//     return sine_table[index];
+// }
+
+uint16_t get_pixel(float u, float v, float time)
+{
+  // float wave = 0.1;
+  
+  // float wave = sinf(u * 6.283164f + time)*0.2f;
+  float val = u  + time;
+  val = val - (int)val;
+  float wave = fast_sine_01(val)*0.2f;
+
+  float y = v*2.0f-1.0f;
+
+  uint8_t color = fabsf(wave-y) < 0.05f? 255 : 0;
+  return rgb888_to_rgb565(color, color, color);
 }
 
 void app_main(void) 
 {
-
 
     printf("START");
 
@@ -62,7 +95,7 @@ void app_main(void)
       .miso_io_num = -1,
       .quadwp_io_num = -1,
       .quadhd_io_num = -1,
-      .max_transfer_sz = LCD_H_RES * 80 * sizeof(uint16_t),
+      .max_transfer_sz = LCD_H_RES * LCD_H_RES * sizeof(uint16_t),
     };
 
     // Initialize the SPI bus
@@ -70,7 +103,7 @@ void app_main(void)
 
     esp_lcd_panel_io_handle_t io_handle = NULL;
     esp_lcd_panel_io_spi_config_t io_config = {
-        .pclk_hz = 40 * 1000 * 1000,
+        .pclk_hz = 80 * 1000 * 1000,
         .dc_gpio_num = PIN_NUM_DC,
         .cs_gpio_num = PIN_NUM_CS,
         .lcd_cmd_bits = LCD_CMD_BITS,
@@ -103,69 +136,57 @@ void app_main(void)
     gpio_set_level(PIN_NUM_BK_LIGHT, 1);
 
 
-    uint16_t black  = 0b0000000000000000;
-    uint16_t red    = 0b1111100000000000;
-    uint16_t green  = 0b0000011111100000;
-    uint16_t blue   = 0b0000000000011111;
-
-
-
-
-    uint16_t *full_screen_bitmap = (uint16_t *)heap_caps_malloc(sizeof(uint16_t) * LCD_H_RES * LCD_V_RES, MALLOC_CAP_DMA);
-    uint16_t *bitmap_dma = (uint16_t *)heap_caps_malloc(sizeof(uint16_t) * 10 * 10, MALLOC_CAP_DMA);
-    if (bitmap_dma == NULL) {
+    uint16_t *full_screen_bitmap = (uint16_t *)heap_caps_malloc(sizeof(uint16_t) * LCD_RES, MALLOC_CAP_DMA);
+    if (full_screen_bitmap == NULL) {
       ESP_LOGE("DMA_ALLOC", "Failed to allocate memory for the bitmap");
       return;
     }
-
-    for (int i = 0; i < LCD_H_RES*LCD_V_RES; i++) {
-      full_screen_bitmap[i] = black;
-
-      if(i%LCD_H_RES <80)
-      {
-        full_screen_bitmap[i] = (red >> 8) | ((red & 0xFF) << 8);
-      }
-      else
-      {
-        if(i%LCD_H_RES <160)
-        {
-          full_screen_bitmap[i] = (green >> 8) | ((green & 0xFF) << 8);
-        }
-        else
-        {
-          full_screen_bitmap[i] = (blue >> 8) | ((blue & 0xFF) << 8);
-        }
-      }
+    // printf("AVAILABLE MEMORY %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
+    vec2_t *uvs = (vec2_t *)malloc(sizeof(vec2_t) * LCD_RES);
+    if (uvs == NULL) {
+      ESP_LOGE("DMA_ALLOC", "Failed to allocate memory for the uvs");
+      return;
+    }
+    for (int i = 0; i < LCD_RES; i++) 
+    {
+      float u = (i%LCD_H_RES)/(LCD_H_RES-1.0f);
+      float v = floor(i/LCD_H_RES)/(LCD_V_RES-1.0f);
+      uvs[i] = create_vec2(u, v);
     }
 
-    float previous_elapsed_time = esp_timer_get_time()/1000.0/1000.0;
-    float accum_time = 0.0;
+    initialize_sine_table();
 
-    ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
+
+    float previous_elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
+    float accum_time = 0.0f;
+
+    float animation_time = 0.0f;
+
+    // ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
     while (true) 
     {
-      float elapsed_time = esp_timer_get_time()/1000.0/1000.0;
+      float elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
       float delta_time = elapsed_time - previous_elapsed_time;
       accum_time += delta_time;
+      printf("update: %f \n", delta_time);
 
-      if(accum_time > 0.0166)
+      if(accum_time > 0.0166f)
       {
-        accum_time = accum_time - 0.0166;
+        accum_time = accum_time - 0.0166f;
+        animation_time += 0.0166f;
 
-        float col = sin(elapsed_time*2)*0.5+0.5;
+        float t = animation_time*0.5f;
 
-        for (int i = 0; i < 10*10; i++) {
-          float x = i%10;
-          float y = floor(i/10.0);
-
-          uint16_t color = get_pixel(x/9.0,y/9.0, col);
-          bitmap_dma[i] = (color >> 8) | ((color & 0xFF) << 8);
+        for (int i = 0; i < LCD_RES; i++) {
+          
+          uint16_t color = get_pixel(uvs[i].x, uvs[i].y, t);
+          full_screen_bitmap[i] = (color >> 8) | ((color & 0xFF) << 8);
         }
 
-        ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 115, 115, 125, 125, bitmap_dma));
+        ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
       }
       previous_elapsed_time = elapsed_time;
 
-      vTaskDelay(2);
+      vTaskDelay(1);
     }
 }
