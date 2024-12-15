@@ -1,6 +1,5 @@
 #include <math.h>
 #include <stdio.h>
-#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_lcd_panel_io_interface.h"
@@ -13,6 +12,10 @@
 #include "esp_lcd_gc9a01.h"
 #include "esp_timer.h"
 #include "esp_log.h"
+#include "esp_err.h"
+#include "esp_spiffs.h"
+#include "esp_system.h"
+
 
 #define LCD_HOST SPI2_HOST
 #define PIN_NUM_DATA0          11  
@@ -28,10 +31,14 @@
 #define LCD_CMD_BITS           8
 #define LCD_PARAM_BITS         8
 
+
+static const char *TAG = "lodepng_example";
+
 typedef struct {
     float x;
     float y;
 } vec2_t;
+
 
 // Function to create a vec2_t
 vec2_t create_vec2(float x, float y) {
@@ -49,45 +56,102 @@ uint16_t rgb888_to_rgb565(uint8_t red, uint8_t green, uint8_t blue) {
     return (r << 11) | (g << 5) | b;   // Combine into RGB565
 }
 
+// Function to load PNG from SPIFFS or SD card
+esp_err_t load_image(const char *filename, uint16_t **image_data) {
 
-#define SINE_TABLE_SIZE 360
-static float sine_table[SINE_TABLE_SIZE];
+    printf("LOAD IMAGE\n");
 
-void initialize_sine_table() {
-    for (int i = 0; i < SINE_TABLE_SIZE; i++) {
-        sine_table[i] = sinf((i/359.0f)* 6.283164f);
+    // Open the file
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        ESP_LOGE(TAG, "Failed to open file %s\n", filename);
+        return ESP_FAIL;
     }
-}
 
-float fast_sine_01(float t)
-{
-  return sine_table[(int)(t*359)];
-}
-// float fast_sine(float angle) {
-//     int index = ((int)angle) % SINE_TABLE_SIZE;
-//     if (index < 0) index += SINE_TABLE_SIZE; // Handle negative angles
-//     return sine_table[index];
-// }
+    printf("FILE OPENED\n");
 
-uint16_t get_pixel(float u, float v, float time)
-{
-  // float wave = 0.1;
-  
-  // float wave = sinf(u * 6.283164f + time)*0.2f;
-  float val = u  + time;
-  val = val - (int)val;
-  float wave = fast_sine_01(val)*0.2f;
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    fseek(file, 0, SEEK_SET);
 
-  float y = v*2.0f-1.0f;
 
-  uint8_t color = fabsf(wave-y) < 0.05f? 255 : 0;
-  return rgb888_to_rgb565(color, color, color);
+    printf("SIZE CALCULATED %ld\n", size);
+
+    // Allocate buffer for the file data
+    // *image_data = (uint16_t*)malloc(size);
+    *image_data = (uint16_t *)heap_caps_malloc(size, MALLOC_CAP_DMA);
+
+    if (*image_data == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for file data\n");
+        fclose(file);
+        return ESP_ERR_NO_MEM;
+    }
+
+    printf("MEMORY ALOCATED \n");
+
+    // Read the file into buffer
+    fread(*image_data, sizeof(uint16_t), size/2, file);
+    fclose(file);
+
+
+    printf("FILE READ \n");
+
+    return ESP_OK;
 }
 
 void app_main(void) 
 {
 
-    printf("START");
+    printf("START\n");
+
+    esp_vfs_spiffs_conf_t conf = {
+      .base_path = "/spiffs",
+      .partition_label = NULL,
+      .max_files = 5,
+      .format_if_mount_failed = true
+    };
+
+    // Use settings defined above to initialize and mount SPIFFS filesystem.
+    // Note: esp_vfs_spiffs_register is an all-in-one convenience function.
+    esp_err_t ret = esp_vfs_spiffs_register(&conf);
+
+    printf("REGISTER SPIFFS\n");
+
+
+    if (ret != ESP_OK) {
+        if (ret == ESP_FAIL) {
+            printf("Failed to mount or format filesystem\n");
+        } else if (ret == ESP_ERR_NOT_FOUND) {
+            printf("Failed to find SPIFFS partition\n");
+        } else {
+            printf("Failed to initialize SPIFFS (%s)\n", esp_err_to_name(ret));
+        }
+        return;
+    }
+
+
+
+
+
+    uint16_t *image_data = NULL;
+
+
+    // Load PNG image from SPIFFS (change path as needed)
+    ESP_ERROR_CHECK(load_image("/spiffs/chicken565", &image_data));
+
+
+
+    // free(image_data);
+
+
+
+
+
+
+
+
+
 
     spi_bus_config_t buscfg = {
       .mosi_io_num = PIN_NUM_DATA0,
@@ -130,6 +194,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_handle, true));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
+    // ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, true, false));
 
     // Turn on backlight
     gpio_set_direction(PIN_NUM_BK_LIGHT, GPIO_MODE_OUTPUT);
@@ -141,20 +206,19 @@ void app_main(void)
       ESP_LOGE("DMA_ALLOC", "Failed to allocate memory for the bitmap");
       return;
     }
-    // printf("AVAILABLE MEMORY %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
-    vec2_t *uvs = (vec2_t *)malloc(sizeof(vec2_t) * LCD_RES);
-    if (uvs == NULL) {
-      ESP_LOGE("DMA_ALLOC", "Failed to allocate memory for the uvs");
-      return;
-    }
-    for (int i = 0; i < LCD_RES; i++) 
-    {
-      float u = (i%LCD_H_RES)/(LCD_H_RES-1.0f);
-      float v = floor(i/LCD_H_RES)/(LCD_V_RES-1.0f);
-      uvs[i] = create_vec2(u, v);
-    }
 
-    initialize_sine_table();
+
+    for(int i=0; i< LCD_RES; i++)
+    {
+      full_screen_bitmap[i] = rgb888_to_rgb565(255,255,255);
+      // float u = (i%LCD_H_RES)/(LCD_H_RES-1.0f);
+      // float v = floor(i/LCD_H_RES)/(LCD_V_RES-1.0f);
+
+      // uint16_t color = rgb888_to_rgb565((uint8_t)(u*255), (uint8_t)(v*255), 0);
+      // full_screen_bitmap[i] = (color >> 8) | ((color & 0xFF) << 8);
+
+    }
+    // printf("AVAILABLE MEMORY %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
 
     float previous_elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
@@ -162,7 +226,46 @@ void app_main(void)
 
     float animation_time = 0.0f;
 
+
+    for (int i = 0; i < 64*64; i++) {
+      
+      uint16_t color = image_data[i];
+
+      image_data[i] = (color >> 8) | ((color & 0xFF) << 8);
+    }
+
+    ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
+
+    const float fixed_dt = 0.0166f;
+    float dir = 1.0f;
+    float speed = 20.0f;
+    bool mirrored = false;
+
+    vec2_t pos = {120.0f, 120.0f};
+    const int chicken_res = 64;
+    const int chicken_half_res = 32;
+
+
+    for(int i=0; i< LCD_RES; i++)
+    {
+      full_screen_bitmap[i] = 0b1111111111111111;
+    }
+
+
+    // const int x = 120;
+    // const int y = 120;
+
+    // for(int i=0; i< 64; i++)
+    // {
+    //   for(int j=0; j<64; j++)
+    //   {
+    //     full_screen_bitmap[((y+i)*240)+ x + j] = image_data[i * 64 + j];
+    //   }
+    // }
+
     // ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
+
+
     while (true) 
     {
       float elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
@@ -170,20 +273,55 @@ void app_main(void)
       accum_time += delta_time;
       printf("update: %f \n", delta_time);
 
-      if(accum_time > 0.0166f)
+      if(accum_time > fixed_dt)
       {
-        accum_time = accum_time - 0.0166f;
-        animation_time += 0.0166f;
+        accum_time = accum_time - fixed_dt;
+        animation_time += fixed_dt;
 
-        float t = animation_time*0.5f;
 
-        for (int i = 0; i < LCD_RES; i++) {
-          
-          uint16_t color = get_pixel(uvs[i].x, uvs[i].y, t);
-          full_screen_bitmap[i] = (color >> 8) | ((color & 0xFF) << 8);
+        for(int i=0; i< LCD_RES; i++)
+        {
+          full_screen_bitmap[i] = 0b1111111111111111;
+        }
+
+
+
+  
+        if(pos.x > 180.0f)
+        {
+          dir *= -1.0f;
+          // ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, true, false));
+          mirrored = true;
+        }
+        if(pos.x < 60.0f)
+        {
+          dir *= -1.0f;
+          // ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, false, false));
+          mirrored = false;
+        }
+
+        pos.x += fixed_dt * dir * speed;
+
+        const int x = (int)pos.x - chicken_half_res;
+        const int y = (int)pos.y - chicken_half_res;
+
+        for(int i=0; i< chicken_res; i++)
+        {
+          for(int j=0; j<chicken_res; j++)
+          {
+            if(mirrored)
+            {
+              full_screen_bitmap[((y+i)*240)+ x + chicken_res-j] = image_data[i * chicken_res + j];
+            }
+            else
+            {
+              full_screen_bitmap[((y+i)*240)+ x + j] = image_data[i * chicken_res + j];
+            }
+          }
         }
 
         ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
+
       }
       previous_elapsed_time = elapsed_time;
 
