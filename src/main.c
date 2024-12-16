@@ -16,6 +16,11 @@
 #include "esp_spiffs.h"
 #include "esp_system.h"
 
+#include <esp_mac.h>
+#include "nvs_flash.h"
+#include <esp_now.h>
+#include <esp_wifi.h>
+#include <string.h>
 
 #define LCD_HOST SPI2_HOST
 #define PIN_NUM_DATA0          11  
@@ -33,6 +38,69 @@
 
 
 static const char *TAG = "lodepng_example";
+
+static float timeSinceMessageReceived = 0.0f;
+
+void esp_now_recv_cb(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len) {
+    if (esp_now_info == NULL || data == NULL || data_len <= 0) {
+        printf("Invalid data received\n");
+        return;
+    }
+    int rssi = esp_now_info->rx_ctrl->rssi;
+
+    printf("Message received width %d dBm\n", rssi);
+
+    // Approximate distance based on RSSI
+    int distance = pow(10, (0 - rssi) / (10 * 2));  // Free-space approximation (n = 2)
+    printf("Estimated distance: ~%d meters\n", distance);
+    printf("Message received Data: %s\n", (char *)data);
+    timeSinceMessageReceived = esp_timer_get_time()/1000.0f/1000.0f;
+}
+
+void esp_now_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status) {
+    printf("Message sent to " MACSTR ", status: %s\n", MAC2STR(mac_addr), status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
+}
+
+void init_esp_now() {
+
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+      ESP_ERROR_CHECK(nvs_flash_erase());
+      ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    // Initialize Wi-Fi in station mode
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    // Initialize ESP-NOW
+    ESP_ERROR_CHECK(esp_now_init());
+    ESP_ERROR_CHECK(esp_now_register_recv_cb(esp_now_recv_cb));
+    ESP_ERROR_CHECK(esp_now_register_send_cb(esp_now_send_cb));
+
+    // Register the broadcast address as a peer
+    esp_now_peer_info_t peer_info = {0};
+
+    uint8_t broadcast_mac[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    memcpy(peer_info.peer_addr, broadcast_mac, ESP_NOW_ETH_ALEN);
+    peer_info.channel = 0;  // Default channel
+    peer_info.encrypt = false;
+
+    if (!esp_now_is_peer_exist(broadcast_mac)) {
+        ESP_ERROR_CHECK(esp_now_add_peer(&peer_info));
+    }
+}
+
+void broadcast_message() {
+    uint8_t broadcast_mac[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    uint8_t data[] = "Hello nearby devices!";
+    
+    ESP_ERROR_CHECK(esp_now_send(broadcast_mac, data, sizeof(data)));
+}
+
 
 typedef struct {
     float x;
@@ -79,8 +147,8 @@ esp_err_t load_image(const char *filename, uint16_t **image_data) {
     printf("SIZE CALCULATED %ld\n", size);
 
     // Allocate buffer for the file data
-    // *image_data = (uint16_t*)malloc(size);
-    *image_data = (uint16_t *)heap_caps_malloc(size, MALLOC_CAP_DMA);
+    *image_data = (uint16_t*)malloc(size);
+    // *image_data = (uint16_t *)heap_caps_malloc(size, MALLOC_CAP_DMA);
 
     if (*image_data == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for file data\n");
@@ -104,6 +172,8 @@ void app_main(void)
 {
 
     printf("START\n");
+    printf("AVAILABLE MEMORY FOR DMA AT INIT: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
+
 
     esp_vfs_spiffs_conf_t conf = {
       .base_path = "/spiffs",
@@ -131,24 +201,33 @@ void app_main(void)
     }
 
 
+    uint16_t *full_screen_bitmap = (uint16_t *)heap_caps_malloc(sizeof(uint16_t) * LCD_RES, MALLOC_CAP_DMA);
+    if (full_screen_bitmap == NULL) {
+      ESP_LOGE("DMA_ALLOC", "Failed to allocate memory for the full screen bitmap, needed: %d, largest free block has %d", sizeof(uint16_t) * LCD_RES, heap_caps_get_largest_free_block(MALLOC_CAP_DMA));
+      return;
+    }
+
+    printf("AVAILABLE MEMORY FOR DMA AFTER FULL SCREEN FRAME BUFFER: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
+
 
 
 
     uint16_t *image_data = NULL;
+    uint16_t *heart_image_data = NULL;
 
 
-    // Load PNG image from SPIFFS (change path as needed)
     ESP_ERROR_CHECK(load_image("/spiffs/chicken565", &image_data));
 
+    printf("AVAILABLE MEMORY FOR DMA AFTER CHICKEN DATA: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
+
+    ESP_ERROR_CHECK(load_image("/spiffs/heart", &heart_image_data));
+
+    printf("AVAILABLE MEMORY FOR DMA AFTER HEART DATA: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
 
-    // free(image_data);
+    init_esp_now();
 
-
-
-
-
-
+    printf("AVAILABLE MEMORY AFTER ESP NOW: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
 
 
@@ -201,24 +280,6 @@ void app_main(void)
     gpio_set_level(PIN_NUM_BK_LIGHT, 1);
 
 
-    uint16_t *full_screen_bitmap = (uint16_t *)heap_caps_malloc(sizeof(uint16_t) * LCD_RES, MALLOC_CAP_DMA);
-    if (full_screen_bitmap == NULL) {
-      ESP_LOGE("DMA_ALLOC", "Failed to allocate memory for the bitmap");
-      return;
-    }
-
-
-    for(int i=0; i< LCD_RES; i++)
-    {
-      full_screen_bitmap[i] = rgb888_to_rgb565(255,255,255);
-      // float u = (i%LCD_H_RES)/(LCD_H_RES-1.0f);
-      // float v = floor(i/LCD_H_RES)/(LCD_V_RES-1.0f);
-
-      // uint16_t color = rgb888_to_rgb565((uint8_t)(u*255), (uint8_t)(v*255), 0);
-      // full_screen_bitmap[i] = (color >> 8) | ((color & 0xFF) << 8);
-
-    }
-    // printf("AVAILABLE MEMORY %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
 
     float previous_elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
@@ -228,10 +289,13 @@ void app_main(void)
 
 
     for (int i = 0; i < 64*64; i++) {
-      
       uint16_t color = image_data[i];
-
       image_data[i] = (color >> 8) | ((color & 0xFF) << 8);
+    }
+
+    for (int i = 0; i < 64*64; i++) {
+      uint16_t color = heart_image_data[i];
+      heart_image_data[i] = (color >> 8) | ((color & 0xFF) << 8);
     }
 
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
@@ -242,6 +306,8 @@ void app_main(void)
     bool mirrored = false;
 
     vec2_t pos = {120.0f, 120.0f};
+    vec2_t heart_pos = {120.0f, 200.0f};
+
     const int chicken_res = 64;
     const int chicken_half_res = 32;
 
@@ -252,26 +318,13 @@ void app_main(void)
     }
 
 
-    // const int x = 120;
-    // const int y = 120;
-
-    // for(int i=0; i< 64; i++)
-    // {
-    //   for(int j=0; j<64; j++)
-    //   {
-    //     full_screen_bitmap[((y+i)*240)+ x + j] = image_data[i * 64 + j];
-    //   }
-    // }
-
-    // ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
-
 
     while (true) 
     {
       float elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
       float delta_time = elapsed_time - previous_elapsed_time;
       accum_time += delta_time;
-      printf("update: %f \n", delta_time);
+      // printf("update: %f \n", delta_time);
 
       if(accum_time > fixed_dt)
       {
@@ -316,6 +369,28 @@ void app_main(void)
             else
             {
               full_screen_bitmap[((y+i)*240)+ x + j] = image_data[i * chicken_res + j];
+            }
+          }
+        }
+
+        const int heart_x = (int)heart_pos.x - chicken_half_res;
+        const int heart_y = (int)heart_pos.y - chicken_half_res;
+
+        if(elapsed_time - timeSinceMessageReceived < 1.0f)
+        {
+
+          for(int i=0; i< chicken_res; i++)
+          {
+            for(int j=0; j<chicken_res; j++)
+            {
+              if(mirrored)
+              {
+                full_screen_bitmap[((heart_y+i)*240)+ heart_x + chicken_res-j] = heart_image_data[i * chicken_res + j];
+              }
+              else
+              {
+                full_screen_bitmap[((heart_y+i)*240)+ heart_x + j] = heart_image_data[i * chicken_res + j];
+              }
             }
           }
         }
