@@ -88,10 +88,14 @@ void init_esp_now() {
     memcpy(peer_info.peer_addr, broadcast_mac, ESP_NOW_ETH_ALEN);
     peer_info.channel = 0;  // Default channel
     peer_info.encrypt = false;
+    // peer_info.ifidx = ESP_IF_WIFI_STA; // Use station interface
+
+    esp_wifi_set_channel(0, WIFI_SECOND_CHAN_NONE); 
 
     if (!esp_now_is_peer_exist(broadcast_mac)) {
         ESP_ERROR_CHECK(esp_now_add_peer(&peer_info));
     }
+    esp_now_set_pmk(NULL);
 }
 
 void broadcast_message() {
@@ -125,7 +129,7 @@ uint16_t rgb888_to_rgb565(uint8_t red, uint8_t green, uint8_t blue) {
 }
 
 // Function to load PNG from SPIFFS or SD card
-esp_err_t load_image(const char *filename, uint16_t **image_data) {
+esp_err_t load_image(const char *filename, uint8_t **image_data, uint16_t **color_table) {
 
     printf("LOAD IMAGE\n");
 
@@ -138,7 +142,6 @@ esp_err_t load_image(const char *filename, uint16_t **image_data) {
 
     printf("FILE OPENED\n");
 
-    // Get file size
     fseek(file, 0, SEEK_END);
     long size = ftell(file);
     fseek(file, 0, SEEK_SET);
@@ -147,10 +150,20 @@ esp_err_t load_image(const char *filename, uint16_t **image_data) {
     printf("SIZE CALCULATED %ld\n", size);
 
     // Allocate buffer for the file data
-    *image_data = (uint16_t*)malloc(size);
-    // *image_data = (uint16_t *)heap_caps_malloc(size, MALLOC_CAP_DMA);
+    long color_table_size = 16 * sizeof(uint16_t);
+    *image_data = (uint8_t*)malloc(size-color_table_size);
+    *color_table = (uint16_t*)malloc(color_table_size);
+
+
+    printf("COLOR TABLE SIZE %ld\n", color_table_size);
+    printf("IMAGE DATA SIZE %ld\n", size-color_table_size);
 
     if (*image_data == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for file data\n");
+        fclose(file);
+        return ESP_ERR_NO_MEM;
+    }
+    if (*color_table == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for file data\n");
         fclose(file);
         return ESP_ERR_NO_MEM;
@@ -158,8 +171,11 @@ esp_err_t load_image(const char *filename, uint16_t **image_data) {
 
     printf("MEMORY ALOCATED \n");
 
-    // Read the file into buffer
-    fread(*image_data, sizeof(uint16_t), size/2, file);
+
+    fread(*color_table, sizeof(uint16_t), 16, file);
+
+    fseek(file, color_table_size, SEEK_SET);
+    fread(*image_data, sizeof(uint8_t), (size-color_table_size), file);
     fclose(file);
 
 
@@ -212,23 +228,21 @@ void app_main(void)
 
 
 
-    uint16_t *image_data = NULL;
-    uint16_t *heart_image_data = NULL;
+    uint8_t *image_data = NULL;
+    uint16_t *chicken_color_table = NULL;
+    uint8_t *heart_image_data = NULL;
+    uint16_t *heart_color_table = NULL;
 
 
-    ESP_ERROR_CHECK(load_image("/spiffs/chicken565", &image_data));
+    ESP_ERROR_CHECK(load_image("/spiffs/chicken", &image_data, &chicken_color_table));
 
     printf("AVAILABLE MEMORY FOR DMA AFTER CHICKEN DATA: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
-    ESP_ERROR_CHECK(load_image("/spiffs/heart", &heart_image_data));
-
+    ESP_ERROR_CHECK(load_image("/spiffs/heart", &heart_image_data, &heart_color_table));
     printf("AVAILABLE MEMORY FOR DMA AFTER HEART DATA: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
 
     init_esp_now();
-
-    printf("AVAILABLE MEMORY AFTER ESP NOW: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
-
 
 
 
@@ -273,7 +287,6 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_handle, true));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
-    // ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, true, false));
 
     // Turn on backlight
     gpio_set_direction(PIN_NUM_BK_LIGHT, GPIO_MODE_OUTPUT);
@@ -288,15 +301,10 @@ void app_main(void)
     float animation_time = 0.0f;
 
 
-    for (int i = 0; i < 64*64; i++) {
-      uint16_t color = image_data[i];
-      image_data[i] = (color >> 8) | ((color & 0xFF) << 8);
-    }
-
-    for (int i = 0; i < 64*64; i++) {
-      uint16_t color = heart_image_data[i];
-      heart_image_data[i] = (color >> 8) | ((color & 0xFF) << 8);
-    }
+    // for (int i = 0; i < 64*64; i++) {
+    //   uint16_t color = image_data[i];
+    //   image_data[i] = (color >> 8) | ((color & 0xFF) << 8);
+    // }
 
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
 
@@ -316,6 +324,9 @@ void app_main(void)
     {
       full_screen_bitmap[i] = 0b1111111111111111;
     }
+
+    
+    printf("AVAILABLE MEMORY FOR AFTER SETUP: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
 
 
@@ -343,13 +354,11 @@ void app_main(void)
         if(pos.x > 180.0f)
         {
           dir *= -1.0f;
-          // ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, true, false));
           mirrored = true;
         }
         if(pos.x < 60.0f)
         {
           dir *= -1.0f;
-          // ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, false, false));
           mirrored = false;
         }
 
@@ -358,17 +367,27 @@ void app_main(void)
         const int x = (int)pos.x - chicken_half_res;
         const int y = (int)pos.y - chicken_half_res;
 
+        uint8_t index = 0;
+        uint16_t col_0 = 0;
+        uint16_t col_1 = 0;
+
         for(int i=0; i< chicken_res; i++)
         {
-          for(int j=0; j<chicken_res; j++)
+          for(int j=0; j<chicken_res/2; j++)
           {
+            index = image_data[(i/2) * chicken_res + j];
+            col_0 = chicken_color_table[(index >> 4)];
+            col_1 = chicken_color_table[index & 0xF];
+
             if(mirrored)
             {
-              full_screen_bitmap[((y+i)*240)+ x + chicken_res-j] = image_data[i * chicken_res + j];
+              full_screen_bitmap[((y+i)*240)+ x + chicken_res-(j*2+0)] = col_0;
+              full_screen_bitmap[((y+i)*240)+ x + chicken_res-(j*2+1)] = col_1;
             }
             else
             {
-              full_screen_bitmap[((y+i)*240)+ x + j] = image_data[i * chicken_res + j];
+              full_screen_bitmap[((y+i)*240)+ x + (j*2+0)] = col_0;
+              full_screen_bitmap[((y+i)*240)+ x + (j*2+1)] = col_1;
             }
           }
         }
@@ -381,15 +400,21 @@ void app_main(void)
 
           for(int i=0; i< chicken_res; i++)
           {
-            for(int j=0; j<chicken_res; j++)
+            for(int j=0; j<chicken_res/2; j++)
             {
+              index = heart_image_data[(i/2) * chicken_res + j];
+              col_0 = heart_color_table[(index >> 4)];
+              col_1 = heart_color_table[index & 0xF];
+
               if(mirrored)
               {
-                full_screen_bitmap[((heart_y+i)*240)+ heart_x + chicken_res-j] = heart_image_data[i * chicken_res + j];
+                full_screen_bitmap[((heart_y+i)*240)+ heart_x + chicken_res-(j*2+0)] = col_0;
+                full_screen_bitmap[((heart_y+i)*240)+ heart_x + chicken_res-(j*2+1)] = col_1;
               }
               else
               {
-                full_screen_bitmap[((heart_y+i)*240)+ heart_x + j] = heart_image_data[i * chicken_res + j];
+                full_screen_bitmap[((heart_y+i)*240)+ heart_x + (j*2+0)] = col_0;
+                full_screen_bitmap[((heart_y+i)*240)+ heart_x + (j*2+1)] = col_1;
               }
             }
           }

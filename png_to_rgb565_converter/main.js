@@ -14,6 +14,7 @@ function processImage(inputPath, outputPath) {
         .pipe(new PNG())
         .on('parsed', function () {
             const rgb565Array = [];
+            const colorTable = {};
             for (let y = this.height - 1; y >= 0; y--) { // Start from the last row and go up
                 for (let x = 0; x < this.width; x++) {
                     const idx = (this.width * y + x) << 2; // Calculate RGBA index
@@ -21,15 +22,42 @@ function processImage(inputPath, outputPath) {
                     const g = this.data[idx + 1];
                     const b = this.data[idx + 2];
                     const rgb565 = convertToRGB565(r, g, b);
+                    colorTable[rgb565] = rgb565;
                     rgb565Array.push(rgb565);
                 }
             }
 
-            // Write the RGB565 data to a binary file
-            const buffer = Buffer.alloc(rgb565Array.length * 2); // Each RGB565 is 2 bytes
-            for (let i = 0; i < rgb565Array.length; i++) {
-                buffer.writeUInt16LE(rgb565Array[i], i * 2);
+            const pixel_array = [];
+            const color_array = Object.values(colorTable);
+            while (color_array.length < 16) {
+              color_array.push(0);
             }
+            
+            for(let i=0; i< rgb565Array.length; i+=2)
+            {
+                const index0 = color_array.indexOf(rgb565Array[i]);
+                const index1 = color_array.indexOf(rgb565Array[i+1]);
+                console.log(index0, index1)
+
+                console.log(((index0 << 4)  | index1).toString(2).padStart(8, '0'))
+                pixel_array.push((index0 << 4)  | index1);
+            }
+            console.log(colorTable)
+
+            // Write the RGB565 data to a binary file
+            const buffer = Buffer.alloc(pixel_array.length + color_array.length*2);
+            
+            for(let i=0; i< color_array.length; i++)
+            {
+              buffer.writeUint16BE(color_array[i], i*2);
+            }
+
+            console.log(color_array)
+            for (let i = 0; i < pixel_array.length; i++) 
+            {
+              buffer.writeUint8(pixel_array[i], i + color_array.length*2);
+            }
+
             fs.writeFileSync(outputPath, buffer);
             console.log(`RGB565 data written to ${outputPath}`);
         })
