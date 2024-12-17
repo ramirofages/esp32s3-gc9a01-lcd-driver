@@ -15,12 +15,15 @@
 #include "esp_err.h"
 #include "esp_spiffs.h"
 #include "esp_system.h"
-
-#include <esp_mac.h>
 #include "nvs_flash.h"
-#include <esp_now.h>
-#include <esp_wifi.h>
+// #include <esp_mac.h>
 #include <string.h>
+
+#include "nimble/nimble_port.h"
+#include "nimble/nimble_port_freertos.h"
+#include "host/ble_hs.h"
+#include "nimble/ble.h"
+#include "services/gap/ble_svc_gap.h"
 
 #define LCD_HOST SPI2_HOST
 #define PIN_NUM_DATA0          11  
@@ -41,70 +44,121 @@ static const char *TAG = "lodepng_example";
 
 static float timeSinceMessageReceived = 0.0f;
 
-void esp_now_recv_cb(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len) {
-    if (esp_now_info == NULL || data == NULL || data_len <= 0) {
-        printf("Invalid data received\n");
-        return;
+
+void start_advertising(void) {
+    struct ble_gap_adv_params adv_params = {0};
+
+    const char *device_name = "NimBLE TEST";
+
+    ble_svc_gap_device_name_set(device_name);
+
+    uint8_t adv_data[] = {
+        0x02, 0x01, 0x06,                     // Flags
+        0x03, 0x03, 0x1A, 0x18,
+        0x0F, 0x09, 'E', 'S', 'P', '3', '2' // Device name
+    };
+
+    ble_gap_adv_set_data(adv_data, sizeof(adv_data));
+
+    adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;  // Undirected connectable advertising
+    adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN; // General discoverable mode
+    adv_params.itvl_min = 160; // 100ms (160 * 0.625ms)
+    adv_params.itvl_max = 160;
+
+    ble_gap_adv_start(0, NULL, BLE_HS_FOREVER, &adv_params, NULL, NULL);
+    printf("Advertising started.\n");
+}
+
+// Callback to process scanned advertisements
+static int scan_callback(struct ble_gap_event *event, void *arg) {
+    if (event->type == BLE_GAP_EVENT_DISC) {
+        struct ble_hs_adv_fields fields;
+        int rc;
+        rc = ble_hs_adv_parse_fields(&fields, event->disc.data, event->disc.length_data);
+        if (rc != 0) {
+            printf("Error parsing advertisement data.\n");
+            return 0;
+        }
+
+        if (fields.uuids16 != NULL) {
+            for (int i = 0; i < fields.num_uuids16; i++) {
+                if (fields.uuids16[i].value == 0x181A) { // Match UUID
+                    printf("ESP32 Advertiser Found!\n");
+                    printf("Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
+                           event->disc.addr.val[5], event->disc.addr.val[4],
+                           event->disc.addr.val[3], event->disc.addr.val[2],
+                           event->disc.addr.val[1], event->disc.addr.val[0]);
+                    printf("RSSI: %d dBm\n", event->disc.rssi);
+                    timeSinceMessageReceived = esp_timer_get_time()/1000.0f/1000.0f;
+                }
+            }
+        }
+        // printf("Advertisement received:\n");
+        // printf("  Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
+        //     event->disc.addr.val[5], event->disc.addr.val[4], event->disc.addr.val[3],
+        //     event->disc.addr.val[2], event->disc.addr.val[1], event->disc.addr.val[0]);
+
+        // printf("  RSSI: %d dBm\n", event->disc.rssi);
     }
-    int rssi = esp_now_info->rx_ctrl->rssi;
-
-    printf("Message received width %d dBm\n", rssi);
-
-    // Approximate distance based on RSSI
-    int distance = pow(10, (0 - rssi) / (10 * 2));  // Free-space approximation (n = 2)
-    printf("Estimated distance: ~%d meters\n", distance);
-    printf("Message received Data: %s\n", (char *)data);
-    timeSinceMessageReceived = esp_timer_get_time()/1000.0f/1000.0f;
+    return 0;
 }
 
-void esp_now_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status) {
-    printf("Message sent to " MACSTR ", status: %s\n", MAC2STR(mac_addr), status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
+// Function to start BLE scanning
+void start_scanning(void) {
+    struct ble_gap_disc_params scan_params = {0};
+
+    scan_params.passive = 1;    // Passive scanning
+    scan_params.itvl = 100*3;     // Scan interval (100 * 0.625ms = 62.5ms)
+    scan_params.window = 50;    // Scan window (50 * 0.625ms = 31.25ms)
+    scan_params.filter_policy = BLE_HCI_SCAN_FILT_NO_WL; // No filter
+    scan_params.limited = 0;
+
+    // Start scanning
+    ble_gap_disc(0, BLE_HS_FOREVER, &scan_params, scan_callback, NULL);
+    printf("Scanning started.\n");
 }
 
-void init_esp_now() {
-
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-
-    // Initialize Wi-Fi in station mode
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    // Initialize ESP-NOW
-    ESP_ERROR_CHECK(esp_now_init());
-    ESP_ERROR_CHECK(esp_now_register_recv_cb(esp_now_recv_cb));
-    ESP_ERROR_CHECK(esp_now_register_send_cb(esp_now_send_cb));
-
-    // Register the broadcast address as a peer
-    esp_now_peer_info_t peer_info = {0};
-
-    uint8_t broadcast_mac[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    memcpy(peer_info.peer_addr, broadcast_mac, ESP_NOW_ETH_ALEN);
-    peer_info.channel = 0;  // Default channel
-    peer_info.encrypt = false;
-    // peer_info.ifidx = ESP_IF_WIFI_STA; // Use station interface
-
-    esp_wifi_set_channel(0, WIFI_SECOND_CHAN_NONE); 
-
-    if (!esp_now_is_peer_exist(broadcast_mac)) {
-        ESP_ERROR_CHECK(esp_now_add_peer(&peer_info));
-    }
-    esp_now_set_pmk(NULL);
+void periodic_adv_host_task(void *param)
+{
+    printf("BLE Host Task Started");
+    /* This function will return only when nimble_port_stop() is executed */
+    nimble_port_run();
+    nimble_port_freertos_deinit();
 }
 
-void broadcast_message() {
-    uint8_t broadcast_mac[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    uint8_t data[] = "Hello nearby devices!";
-    
-    ESP_ERROR_CHECK(esp_now_send(broadcast_mac, data, sizeof(data)));
+void ble_app_on_sync(void) {
+    start_advertising(); // Start advertising
+    start_scanning();    // Start scanning
 }
+void init_nimble()
+{
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    ret = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(ret);
+  printf("NVM FLASH INITIALIZED\n\n");
 
+  ret = nimble_port_init();
+  if (ret != ESP_OK) {
+      printf("Failed to init nimble %d ", ret);
+      return;
+  }
+
+  printf("NIMBLE PORT INITIALIZED\n\n");
+
+  // ble_svc_gap_init();
+
+  // printf("NIMBLE GAP INITIALIZED\n\n");
+
+  ble_hs_cfg.sync_cb = ble_app_on_sync;
+  ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
+  // nimble_port_run(); // This starts the NimBLE task.
+  nimble_port_freertos_init(periodic_adv_host_task);
+  printf("NIMBLE PORT RUNNING\n\n");
+
+}
 
 typedef struct {
     float x;
@@ -242,10 +296,6 @@ void app_main(void)
     printf("AVAILABLE MEMORY FOR DMA AFTER HEART DATA: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
 
-    init_esp_now();
-
-
-
     spi_bus_config_t buscfg = {
       .mosi_io_num = PIN_NUM_DATA0,
       .sclk_io_num = PIN_NUM_PCLK,
@@ -326,9 +376,12 @@ void app_main(void)
     }
 
     
-    printf("AVAILABLE MEMORY FOR AFTER SETUP: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    printf("AVAILABLE MEMORY AFTER IMAGE SETUP: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
+    // printf("AVAILABLE MEMORY FOR DMA AFTER FULL SCREEN FRAME BUFFER: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
+    init_nimble();
 
+    printf("AVAILABLE MEMORY AFTER NIMBLE SETUP: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
     while (true) 
     {
