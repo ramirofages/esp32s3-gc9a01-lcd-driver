@@ -18,6 +18,7 @@
 #define PIN_NUM_BK_LIGHT       2
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 240
+
 esp_err_t screen_manager_init(screen_manager_t *screen_manager)
 {
   spi_bus_config_t buscfg = {
@@ -87,4 +88,38 @@ esp_err_t screen_manager_draw(screen_manager_t *screen_manager)
 {
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(screen_manager->panel_handle, 0, 0, screen_manager->width, screen_manager->height, screen_manager->full_screen_bitmap));
     return ESP_OK;
+}
+
+
+esp_err_t screen_manager_draw_bitmap_with_color_table(screen_manager_t *screen_manager, uint8_t *bitmap, uint16_t *color_table, int pos_x, int pos_y, int bitmap_width, bool mirrored)
+{
+  const int x = pos_x - bitmap_width/2;
+  const int y = pos_y - bitmap_width/2;
+
+  uint8_t index = 0;
+  uint16_t col_0 = 0;
+  uint16_t col_1 = 0;
+
+  for(int i=0; i< bitmap_width; i++)
+  {
+    for(int j=0; j<bitmap_width/2; j++)
+    {
+      index = bitmap[(i/2) * bitmap_width + j];
+      col_0 = color_table[(index >> 4)];
+      col_1 = color_table[index & 0xF];
+
+      if(mirrored)
+      {
+        screen_manager->full_screen_bitmap[((y+i)*240)+ x + bitmap_width-(j*2+0)] = col_0;
+        screen_manager->full_screen_bitmap[((y+i)*240)+ x + bitmap_width-(j*2+1)] = col_1;
+      }
+      else
+      {
+        screen_manager->full_screen_bitmap[((y+i)*240)+ x + (j*2+0)] = col_0;
+        screen_manager->full_screen_bitmap[((y+i)*240)+ x + (j*2+1)] = col_1;
+      }
+    }
+  }
+
+  return ESP_OK;
 }

@@ -2,14 +2,8 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-// #include "esp_lcd_panel_io_interface.h"
-// #include "esp_lcd_panel_io.h"
-// #include "esp_lcd_panel_ops.h"
-// #include "esp_lcd_panel_vendor.h"
 #include "esp_heap_caps.h"
-// #include "driver/spi_master.h"
-// #include "driver/gpio.h"
-// #include "esp_lcd_gc9a01.h"
+
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "esp_err.h"
@@ -19,21 +13,7 @@
 #include "image_loader.h"
 #include "screen_manager.h"
 
-// #define LCD_HOST SPI2_HOST
-// #define PIN_NUM_DATA0          11  
-// #define PIN_NUM_PCLK           10
-// #define PIN_NUM_CS             9
-// #define PIN_NUM_DC             8
-// #define PIN_NUM_RST            14
-// #define PIN_NUM_BK_LIGHT       2
-
-// #define LCD_H_RES              240
-// #define LCD_V_RES              240
 #define LCD_RES 240*240
-// #define LCD_CMD_BITS           8
-// #define LCD_PARAM_BITS         8
-
-
 
 typedef struct {
     float x;
@@ -97,8 +77,6 @@ void app_main(void)
     vec2_t heart_pos = {120.0f, 200.0f};
 
     const int chicken_res = 64;
-    const int chicken_half_res = 32;
-
 
     for(int i=0; i< LCD_RES; i++)
     {
@@ -147,63 +125,16 @@ void app_main(void)
 
         pos.x += fixed_dt * dir * speed;
 
-        const int x = (int)pos.x - chicken_half_res;
-        const int y = (int)pos.y - chicken_half_res;
+        screen_manager_draw_bitmap_with_color_table(&screen_manager, image_data, chicken_color_table, (int)pos.x, (int)pos.y, chicken_res, mirrored);
 
-        uint8_t index = 0;
-        uint16_t col_0 = 0;
-        uint16_t col_1 = 0;
-
-        for(int i=0; i< chicken_res; i++)
-        {
-          for(int j=0; j<chicken_res/2; j++)
-          {
-            index = image_data[(i/2) * chicken_res + j];
-            col_0 = chicken_color_table[(index >> 4)];
-            col_1 = chicken_color_table[index & 0xF];
-
-            if(mirrored)
-            {
-              screen_manager.full_screen_bitmap[((y+i)*240)+ x + chicken_res-(j*2+0)] = col_0;
-              screen_manager.full_screen_bitmap[((y+i)*240)+ x + chicken_res-(j*2+1)] = col_1;
-            }
-            else
-            {
-              screen_manager.full_screen_bitmap[((y+i)*240)+ x + (j*2+0)] = col_0;
-              screen_manager.full_screen_bitmap[((y+i)*240)+ x + (j*2+1)] = col_1;
-            }
-          }
-        }
-
-        const int heart_x = (int)heart_pos.x - chicken_half_res;
-        const int heart_y = (int)heart_pos.y - chicken_half_res;
+        const int heart_x = (int)heart_pos.x;
+        const int heart_y = (int)heart_pos.y;
         
         if(elapsed_time - ble_manager->timeSinceLastMessageReceived < 1.0f)
         {
-
-          for(int i=0; i< chicken_res; i++)
-          {
-            for(int j=0; j<chicken_res/2; j++)
-            {
-              index = heart_image_data[(i/2) * chicken_res + j];
-              col_0 = heart_color_table[(index >> 4)];
-              col_1 = heart_color_table[index & 0xF];
-
-              if(mirrored)
-              {
-                screen_manager.full_screen_bitmap[((heart_y+i)*240)+ heart_x + chicken_res-(j*2+0)] = col_0;
-                screen_manager.full_screen_bitmap[((heart_y+i)*240)+ heart_x + chicken_res-(j*2+1)] = col_1;
-              }
-              else
-              {
-                screen_manager.full_screen_bitmap[((heart_y+i)*240)+ heart_x + (j*2+0)] = col_0;
-                screen_manager.full_screen_bitmap[((heart_y+i)*240)+ heart_x + (j*2+1)] = col_1;
-              }
-            }
-          }
+          screen_manager_draw_bitmap_with_color_table(&screen_manager, heart_image_data, heart_color_table, heart_x, heart_y, chicken_res, false);
         }
 
-        // ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, full_screen_bitmap));
         screen_manager_draw(&screen_manager);
 
       }

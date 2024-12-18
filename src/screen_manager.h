@@ -14,6 +14,7 @@ typedef struct {
 
 esp_err_t screen_manager_init(screen_manager_t *screen_manager);
 esp_err_t screen_manager_draw(screen_manager_t *screen_manager);
-esp_err_t screen_manager_draw_bitmap_with_color_table(screen_manager_t *screen_manager, uint8_t *bitmap, uint16_t *color_table);
+esp_err_t screen_manager_draw_bitmap_with_color_table(screen_manager_t *screen_manager, uint8_t *bitmap, uint16_t *color_table, int pos_x, int pos_y, int bitmap_width, bool mirrored);
+
 
 #endif 
