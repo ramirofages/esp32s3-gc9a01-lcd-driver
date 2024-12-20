@@ -96,7 +96,7 @@ void ble_manager_start_host_task(void *param)
 
 esp_err_t ble_manager_init(ble_manager_t **ble_manager_addr)
 {
-  ble_manager.timeSinceLastMessageReceived = 5.0f;
+  ble_manager.timeSinceLastMessageReceived = -100.0f;
 
   *ble_manager_addr = &ble_manager;
 

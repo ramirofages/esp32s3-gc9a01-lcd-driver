@@ -158,17 +158,23 @@ void app_main(void)
         }
         chicken_pos_1.x += fixed_dt * chicken_dir_1.x * speed;
         chicken_pos_1.y += fixed_dt * chicken_dir_1.y * speed;
-
-
-        if(chicken_pos_0.y > chicken_pos_1.y)
+        // printf("time difference %f \n",elapsed_time - ble_manager->timeSinceLastMessageReceived );
+        if(elapsed_time - ble_manager->timeSinceLastMessageReceived > 10.0f)
         {
           screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
-          screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
         }
         else
         {
-          screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
-          screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
+          if(chicken_pos_0.y > chicken_pos_1.y)
+          {
+            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
+            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
+          }
+          else
+          {
+            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
+            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
+          }
         }
         
         const int heart_x = (int)heart_pos.x;
