@@ -51,14 +51,16 @@ void app_main(void)
     screen_manager_init(&screen_manager);
 
 
-    uint8_t *image_data = NULL;
+    uint8_t *chicken_image_data = NULL;
     uint16_t *chicken_color_table = NULL;
+    uint8_t *chicken_alpha_table = NULL;
     uint8_t *heart_image_data = NULL;
     uint16_t *heart_color_table = NULL;
+    uint8_t *heart_alpha_table = NULL;
 
 
-    ESP_ERROR_CHECK(image_loader_load("/spiffs/chicken", &image_data, &chicken_color_table));
-    ESP_ERROR_CHECK(image_loader_load("/spiffs/heart", &heart_image_data, &heart_color_table));
+    ESP_ERROR_CHECK(image_loader_load("/spiffs/chicken", &chicken_image_data, &chicken_color_table, &chicken_alpha_table));
+    ESP_ERROR_CHECK(image_loader_load("/spiffs/heart", &heart_image_data, &heart_color_table, &heart_alpha_table));
 
 
     float previous_elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
@@ -69,19 +71,19 @@ void app_main(void)
 
 
     const float fixed_dt = 0.0166f;
-    float dir = 1.0f;
     float speed = 20.0f;
-    bool mirrored = false;
 
-    vec2_t pos = {120.0f, 120.0f};
+    vec2_t chicken_pos_0 = {120.0f, 120.0f};
+    vec2_t chicken_dir_0 = {1.0f, 1.0f};
+    
+    vec2_t chicken_pos_1 = {45.0f, 70.0f};
+    vec2_t chicken_dir_1 = {1.0f, 1.0f};
+    
     vec2_t heart_pos = {120.0f, 200.0f};
+
 
     const int chicken_res = 64;
 
-    for(int i=0; i< LCD_RES; i++)
-    {
-      screen_manager.full_screen_bitmap[i] = 0b1111111111111111;
-    }
     screen_manager_draw(&screen_manager);
 
     
@@ -93,7 +95,8 @@ void app_main(void)
 
     printf("TIME SINCE LAST RECEIVED %f\n", ble_manager->timeSinceLastMessageReceived);
     printf("AVAILABLE MEMORY AFTER NIMBLE SETUP: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
-
+    uint16_t background_color = rgb888_to_rgb565(powf(14.0f/255.0f, 0.4545f)*255,powf(63.0f/255.0f, 0.4545f)*255,powf(27.0f/255.0f, 0.4545f)*255);
+    background_color = (background_color >> 8) | ((background_color & 0xFF) << 8);
     while (true) 
     {
       float elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
@@ -103,40 +106,83 @@ void app_main(void)
 
       if(accum_time > fixed_dt)
       {
+
+        // float start_measure = esp_timer_get_time()/1000.0f/1000.0f;
         accum_time = accum_time - fixed_dt;
         animation_time += fixed_dt;
 
 
         for(int i=0; i< LCD_RES; i++)
         {
-          screen_manager.full_screen_bitmap[i] = 0b1111111111111111;
+          screen_manager.full_screen_bitmap[i] = background_color;
         }
   
-        if(pos.x > 180.0f)
+        if(chicken_pos_0.x > 180.0f)
         {
-          dir *= -1.0f;
-          mirrored = true;
+          chicken_dir_0.x = -1.0f;
         }
-        if(pos.x < 60.0f)
+        if(chicken_pos_0.x < 60.0f)
         {
-          dir *= -1.0f;
-          mirrored = false;
+          chicken_dir_0.x = 1.0f;
         }
 
-        pos.x += fixed_dt * dir * speed;
+        if(chicken_pos_0.y > 200.0f)
+        {
+          chicken_dir_0.y = -1.0f;
+        }
+        if(chicken_pos_0.y < 40.0f)
+        {
+          chicken_dir_0.y = 1.0f;
+        }
+        chicken_pos_0.x += fixed_dt * chicken_dir_0.x * speed;
+        chicken_pos_0.y += fixed_dt * chicken_dir_0.y * speed;
 
-        screen_manager_draw_bitmap_with_color_table(&screen_manager, image_data, chicken_color_table, (int)pos.x, (int)pos.y, chicken_res, mirrored);
 
+
+        if(chicken_pos_1.x > 180.0f)
+        {
+          chicken_dir_1.x = -1.0f;
+        }
+        if(chicken_pos_1.x < 60.0f)
+        {
+          chicken_dir_1.x = 1.0f;
+        }
+
+        if(chicken_pos_1.y > 200.0f)
+        {
+          chicken_dir_1.y = -1.0f;
+        }
+        if(chicken_pos_1.y < 40.0f)
+        {
+          chicken_dir_1.y = 1.0f;
+        }
+        chicken_pos_1.x += fixed_dt * chicken_dir_1.x * speed;
+        chicken_pos_1.y += fixed_dt * chicken_dir_1.y * speed;
+
+
+        if(chicken_pos_0.y > chicken_pos_1.y)
+        {
+          screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
+          screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
+        }
+        else
+        {
+          screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
+          screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
+        }
+        
         const int heart_x = (int)heart_pos.x;
         const int heart_y = (int)heart_pos.y;
         
         if(elapsed_time - ble_manager->timeSinceLastMessageReceived < 1.0f)
         {
-          screen_manager_draw_bitmap_with_color_table(&screen_manager, heart_image_data, heart_color_table, heart_x, heart_y, chicken_res, false);
+          screen_manager_draw_bitmap_with_color_table(&screen_manager, heart_image_data, heart_color_table, heart_alpha_table, heart_x, heart_y, chicken_res, false);
         }
 
         screen_manager_draw(&screen_manager);
 
+        // float delta_measure = (esp_timer_get_time()/1000.0f/1000.0f)-start_measure;
+        // printf("update time %f\n", delta_measure);
       }
       previous_elapsed_time = elapsed_time;
 

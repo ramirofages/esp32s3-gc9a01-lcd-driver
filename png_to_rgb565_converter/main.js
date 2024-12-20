@@ -21,9 +21,11 @@ function processImage(inputPath, outputPath) {
                     const r = this.data[idx];
                     const g = this.data[idx + 1];
                     const b = this.data[idx + 2];
+                    const a = this.data[idx + 3] > 0? 1 : 0;
                     const rgb565 = convertToRGB565(r, g, b);
-                    colorTable[rgb565] = rgb565;
-                    rgb565Array.push(rgb565);
+                    const composed_color = (rgb565 << 8) | a; 
+                    colorTable[composed_color] = composed_color;
+                    rgb565Array.push(composed_color);
                 }
             }
 
@@ -37,25 +39,27 @@ function processImage(inputPath, outputPath) {
             {
                 const index0 = color_array.indexOf(rgb565Array[i]);
                 const index1 = color_array.indexOf(rgb565Array[i+1]);
-                console.log(index0, index1)
-
-                console.log(((index0 << 4)  | index1).toString(2).padStart(8, '0'))
+                // console.log(index0, index1)
+                // console.log(((index0 << 4)  | index1).toString(2).padStart(8, '0'))
                 pixel_array.push((index0 << 4)  | index1);
             }
             console.log(colorTable)
 
             // Write the RGB565 data to a binary file
-            const buffer = Buffer.alloc(pixel_array.length + color_array.length*2);
+            const buffer = Buffer.alloc(pixel_array.length + color_array.length*3);
             
             for(let i=0; i< color_array.length; i++)
             {
-              buffer.writeUint16BE(color_array[i], i*2);
+              buffer.writeUint16BE(color_array[i] >> 8, i*3);
+              buffer.writeUint8(color_array[i] & 0xFF, i*3+2);
+              // buffer.writeUint16BE(0b0000000000000001, i*3);
+              // buffer.writeUint8(0b00000000, i*3+2);
             }
 
-            console.log(color_array)
+            // console.log(color_array)
             for (let i = 0; i < pixel_array.length; i++) 
             {
-              buffer.writeUint8(pixel_array[i], i + color_array.length*2);
+              buffer.writeUint8(pixel_array[i], i + color_array.length*3);
             }
 
             fs.writeFileSync(outputPath, buffer);

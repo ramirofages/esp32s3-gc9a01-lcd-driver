@@ -90,8 +90,11 @@ esp_err_t screen_manager_draw(screen_manager_t *screen_manager)
     return ESP_OK;
 }
 
-
-esp_err_t screen_manager_draw_bitmap_with_color_table(screen_manager_t *screen_manager, uint8_t *bitmap, uint16_t *color_table, int pos_x, int pos_y, int bitmap_width, bool mirrored)
+uint16_t screen_manager_mix_color(uint16_t from, uint16_t to, uint8_t t)
+{
+  return to * t + (1-t) * from;
+}
+esp_err_t screen_manager_draw_bitmap_with_color_table(screen_manager_t *screen_manager, uint8_t *bitmap, uint16_t *color_table, uint8_t *alpha_table, int pos_x, int pos_y, int bitmap_width, bool mirrored)
 {
   const int x = pos_x - bitmap_width/2;
   const int y = pos_y - bitmap_width/2;
@@ -99,6 +102,10 @@ esp_err_t screen_manager_draw_bitmap_with_color_table(screen_manager_t *screen_m
   uint8_t index = 0;
   uint16_t col_0 = 0;
   uint16_t col_1 = 0;
+  uint16_t current_col = 0;
+  uint8_t alpha_0 = 0;
+  uint8_t alpha_1 = 0;
+
 
   for(int i=0; i< bitmap_width; i++)
   {
@@ -107,16 +114,30 @@ esp_err_t screen_manager_draw_bitmap_with_color_table(screen_manager_t *screen_m
       index = bitmap[(i/2) * bitmap_width + j];
       col_0 = color_table[(index >> 4)];
       col_1 = color_table[index & 0xF];
+      alpha_0 = alpha_table[(index >> 4)];
+      alpha_1 = alpha_table[index & 0xF];
 
       if(mirrored)
       {
-        screen_manager->full_screen_bitmap[((y+i)*240)+ x + bitmap_width-(j*2+0)] = col_0;
-        screen_manager->full_screen_bitmap[((y+i)*240)+ x + bitmap_width-(j*2+1)] = col_1;
+        // b*t + (1-t)*a
+        current_col = screen_manager->full_screen_bitmap[((y+i)*240)+ x + bitmap_width-(j*2+0)];
+        current_col = screen_manager_mix_color(current_col, col_0, alpha_0);
+        screen_manager->full_screen_bitmap[((y+i)*240)+ x + bitmap_width-(j*2+0)] = current_col;
+
+
+        current_col = screen_manager->full_screen_bitmap[((y+i)*240)+ x + bitmap_width-(j*2+1)];
+        current_col = screen_manager_mix_color(current_col, col_1, alpha_1);
+        screen_manager->full_screen_bitmap[((y+i)*240)+ x + bitmap_width-(j*2+1)] = current_col;
       }
       else
       {
-        screen_manager->full_screen_bitmap[((y+i)*240)+ x + (j*2+0)] = col_0;
-        screen_manager->full_screen_bitmap[((y+i)*240)+ x + (j*2+1)] = col_1;
+        current_col = screen_manager->full_screen_bitmap[((y+i)*240)+ x + (j*2+0)];
+        current_col = screen_manager_mix_color(current_col, col_0, alpha_0);
+        screen_manager->full_screen_bitmap[((y+i)*240)+ x + (j*2+0)] = current_col;
+
+        current_col = screen_manager->full_screen_bitmap[((y+i)*240)+ x + (j*2+1)];
+        current_col = screen_manager_mix_color(current_col, col_1, alpha_1);
+        screen_manager->full_screen_bitmap[((y+i)*240)+ x + (j*2+1)] = current_col;
       }
     }
   }
