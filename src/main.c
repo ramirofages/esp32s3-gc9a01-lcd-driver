@@ -52,16 +52,22 @@ void app_main(void)
 
 
     uint8_t *chicken_image_data = NULL;
-    uint16_t *chicken_color_table = NULL;
-    uint8_t *chicken_alpha_table = NULL;
     uint8_t *heart_image_data = NULL;
     uint16_t *heart_color_table = NULL;
     uint8_t *heart_alpha_table = NULL;
 
+    uint16_t *chicken_color_table_0 = NULL;
+    uint8_t *chicken_alpha_table_0 = NULL;
 
-    ESP_ERROR_CHECK(image_loader_load("/spiffs/chicken", &chicken_image_data, &chicken_color_table, &chicken_alpha_table));
-    ESP_ERROR_CHECK(image_loader_load("/spiffs/heart", &heart_image_data, &heart_color_table, &heart_alpha_table));
+    uint16_t *chicken_color_table_1 = NULL;
+    uint8_t *chicken_alpha_table_1 = NULL;
 
+    ESP_ERROR_CHECK(image_loader_load_image("/spiffs/chicken", &chicken_image_data));
+    ESP_ERROR_CHECK(image_loader_load_image("/spiffs/heart", &heart_image_data));
+
+    ESP_ERROR_CHECK(image_loader_load_color_table("/spiffs/chicken_color_table_0", &chicken_color_table_0, &chicken_alpha_table_0));
+    ESP_ERROR_CHECK(image_loader_load_color_table("/spiffs/chicken_color_table_1", &chicken_color_table_1, &chicken_alpha_table_1));
+    ESP_ERROR_CHECK(image_loader_load_color_table("/spiffs/heart_color_table", &heart_color_table, &heart_alpha_table));
 
     float previous_elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
     float accum_time = 0.0f;
@@ -161,19 +167,19 @@ void app_main(void)
         // printf("time difference %f \n",elapsed_time - ble_manager->timeSinceLastMessageReceived );
         if(elapsed_time - ble_manager->timeSinceLastMessageReceived > 10.0f)
         {
-          screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
+          screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table_0, chicken_alpha_table_0, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
         }
         else
         {
           if(chicken_pos_0.y > chicken_pos_1.y)
           {
-            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
-            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
+            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table_0, chicken_alpha_table_0, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
+            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table_1, chicken_alpha_table_1, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
           }
           else
           {
-            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
-            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table, chicken_alpha_table, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
+            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table_1, chicken_alpha_table_1, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
+            screen_manager_draw_bitmap_with_color_table(&screen_manager, chicken_image_data, chicken_color_table_0, chicken_alpha_table_0, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
           }
         }
         

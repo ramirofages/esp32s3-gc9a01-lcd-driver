@@ -1,9 +1,52 @@
 #include "esp_err.h"
 #include "esp_spiffs.h"
 
-esp_err_t image_loader_load(const char *filename, uint8_t **image_data, uint16_t **color_table, uint8_t **alpha_table) {
+esp_err_t image_loader_load_image(const char *filename, uint8_t **image_data) {
 
     printf("LOAD IMAGE\n");
+
+    // Open the file
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        printf("Failed to open file %s\n", filename);
+        return ESP_FAIL;
+    }
+
+    printf("FILE OPENED\n");
+
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+
+    printf("SIZE CALCULATED %ld\n", size);
+
+
+    *image_data = (uint8_t*)malloc(size);
+
+    printf("IMAGE DATA SIZE %ld\n", size);
+
+    if (*image_data == NULL) {
+        printf("Failed to allocate memory for file image data\n");
+        fclose(file);
+        return ESP_ERR_NO_MEM;
+    }
+
+    printf("MEMORY ALOCATED \n");
+
+
+    fread(*image_data, sizeof(uint8_t), size, file);
+    fclose(file);
+
+
+    printf("FILE READ \n");
+
+    return ESP_OK;
+}
+
+esp_err_t image_loader_load_color_table(const char *filename, uint16_t **color_table, uint8_t **alpha_table)
+{
+  printf("LOAD IMAGE\n");
 
     // Open the file
     FILE *file = fopen(filename, "rb");
@@ -25,7 +68,6 @@ esp_err_t image_loader_load(const char *filename, uint8_t **image_data, uint16_t
     long alpha_table_size = 16 * sizeof(uint8_t);
     long header_size = color_table_size + alpha_table_size;
 
-    *image_data = (uint8_t*)malloc(size-header_size);
     *color_table = (uint16_t*)malloc(color_table_size);
     *alpha_table = (uint8_t*) malloc(alpha_table_size);
 
@@ -35,11 +77,6 @@ esp_err_t image_loader_load(const char *filename, uint8_t **image_data, uint16_t
     printf("HEADER DATA SIZE %ld\n", header_size);
     printf("IMAGE DATA SIZE %ld\n", size-header_size);
 
-    if (*image_data == NULL) {
-        printf("Failed to allocate memory for file image data\n");
-        fclose(file);
-        return ESP_ERR_NO_MEM;
-    }
     if (*color_table == NULL) {
         printf("Failed to allocate memory for file color table data\n");
         fclose(file);
@@ -62,13 +99,8 @@ esp_err_t image_loader_load(const char *filename, uint8_t **image_data, uint16_t
 
       fseek(file, sizeof(uint8_t) * 3 * i + sizeof(uint16_t), SEEK_SET);
       fread(&((*alpha_table)[i]), sizeof(uint8_t), 1, file);
-
-      // (*color_table)[i] = (((*table)[i*3+0])) | ((*table)[i*3+1] << 8);
     }
     printf("TABLE READ \n");
-
-    fseek(file, header_size, SEEK_SET);
-    fread(*image_data, sizeof(uint8_t), (size-header_size), file);
     fclose(file);
 
 
@@ -76,6 +108,7 @@ esp_err_t image_loader_load(const char *filename, uint8_t **image_data, uint16_t
 
     return ESP_OK;
 }
+
 
 
 esp_err_t image_loader_init()
