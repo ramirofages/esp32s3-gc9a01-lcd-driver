@@ -23,7 +23,7 @@ void ble_manager_start_advertising(void) {
     uint8_t adv_data[] = {
         0x02, 0x01, 0x06,                     // Flags
         0x03, 0x03, 0x1A, 0x18,
-        0x0F, 0x09, 'E', 'S', 'P', '3', '2' // Device name
+        0x06, 0x09, 'E', 'S', 'P', '3', '2' // Device name
     };
 
     ble_gap_adv_set_data(adv_data, sizeof(adv_data));
