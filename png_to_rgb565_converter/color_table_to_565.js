@@ -14,7 +14,6 @@ function processImage(inputPath, outputPath) {
         .pipe(new PNG())
         .on('parsed', function () {
             const rgb565Array = [];
-            const colorTable = {};
             for (let y = this.height - 1; y >= 0; y--) { // Start from the last row and go up
                 for (let x = 0; x < this.width; x++) {
                     const idx = (this.width * y + x) << 2; // Calculate RGBA index
@@ -24,33 +23,17 @@ function processImage(inputPath, outputPath) {
                     const a = this.data[idx + 3] > 0? 1 : 0;
                     const rgb565 = convertToRGB565(r, g, b);
                     const composed_color = (rgb565 << 8) | a; 
-                    colorTable[composed_color] = composed_color;
                     rgb565Array.push(composed_color);
                 }
             }
 
-            const pixel_array = [];
-            const color_array = Object.values(colorTable);
-            while (color_array.length < 16) {
-              color_array.push(0);
-            }
-
-
-            
-            for(let i=0; i< rgb565Array.length; i+=2)
-            {
-                const index0 = color_array.indexOf(rgb565Array[i]);
-                const index1 = color_array.indexOf(rgb565Array[i+1]);
-                pixel_array.push((index0 << 4)  | index1);
-            }
-            console.log(colorTable)
-
             // Write the RGB565 data to a binary file
-            const buffer = Buffer.alloc(pixel_array.length);
-
-            for (let i = 0; i < pixel_array.length; i++) 
+            const buffer = Buffer.alloc(rgb565Array.length*3);
+            
+            for(let i=0; i< rgb565Array.length; i++)
             {
-              buffer.writeUint8(pixel_array[i], i);
+              buffer.writeUint16BE(rgb565Array[i] >> 8, i*3);
+              buffer.writeUint8(rgb565Array[i] & 0xFF, i*3+2);
             }
 
             fs.writeFileSync(outputPath, buffer);
