@@ -49,7 +49,7 @@ esp_err_t image_loader_load_image(const char *filename, uint8_t **image_data) {
 
 esp_err_t image_loader_load_color_table(const char *filename, color_table_t *color_table)
 {
-  printf("LOAD IMAGE\n");
+  printf("LOAD COLOR TABLE\n");
 
     // Open the file
     FILE *file = fopen(filename, "rb");
@@ -58,28 +58,19 @@ esp_err_t image_loader_load_color_table(const char *filename, color_table_t *col
         return ESP_FAIL;
     }
 
-    printf("FILE OPENED\n");
-
     fseek(file, 0, SEEK_END);
     long size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
 
-    printf("SIZE CALCULATED %ld\n", size);
+    printf("FILE SIZE %ld\n", size);
 
     long color_table_size = 16 * sizeof(uint16_t);
     long alpha_table_size = 16 * sizeof(uint8_t);
-    long header_size = color_table_size + alpha_table_size;
     
     
-    // *color_table = (uint16_t*)malloc(color_table_size);
-    // *alpha_table = (uint8_t*) malloc(alpha_table_size);
-
-
     printf("COLOR TABLE SIZE %ld\n", color_table_size);
     printf("ALPHA TABLE SIZE %ld\n", alpha_table_size);
-    printf("HEADER DATA SIZE %ld\n", header_size);
-    printf("IMAGE DATA SIZE %ld\n", size-header_size);
 
 
 
@@ -112,11 +103,10 @@ esp_err_t image_loader_load_color_table(const char *filename, color_table_t *col
       fseek(file, sizeof(uint8_t) * 3 * i + sizeof(uint16_t), SEEK_SET);
       fread(&((color_table->alpha_array)[i]), sizeof(uint8_t), 1, file);
     }
-    printf("TABLE READ \n");
     fclose(file);
 
 
-    printf("FILE READ \n");
+    printf("FILE READ COMPLETED \n");
 
     return ESP_OK;
 }

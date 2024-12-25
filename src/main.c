@@ -56,23 +56,39 @@
 
 
       uint8_t *chicken_image_data = NULL;
+      uint8_t *egg_0_image_data = NULL;
+      uint8_t *egg_1_image_data = NULL;
+      uint8_t *egg_2_image_data = NULL;
       uint8_t *heart_image_data = NULL;
 
       color_table_t chicken_color_table_0;
       color_table_t chicken_color_table_1;
       color_table_t heart_color_table;
+      color_table_t egg_0_color_table;
+      color_table_t egg_1_color_table;
+      color_table_t egg_2_color_table;
 
       ESP_ERROR_CHECK(image_loader_load_image("/spiffs/chicken", &chicken_image_data));
+      ESP_ERROR_CHECK(image_loader_load_image("/spiffs/egg_0", &egg_0_image_data));
+      ESP_ERROR_CHECK(image_loader_load_image("/spiffs/egg_1", &egg_1_image_data));
+      ESP_ERROR_CHECK(image_loader_load_image("/spiffs/egg_2", &egg_2_image_data));
       ESP_ERROR_CHECK(image_loader_load_image("/spiffs/heart", &heart_image_data));
 
       ESP_ERROR_CHECK(image_loader_load_color_table("/spiffs/chicken_color_table_0", &chicken_color_table_0));
       ESP_ERROR_CHECK(image_loader_load_color_table("/spiffs/chicken_color_table_1", &chicken_color_table_1));
       ESP_ERROR_CHECK(image_loader_load_color_table("/spiffs/heart_color_table",     &heart_color_table));
+      ESP_ERROR_CHECK(image_loader_load_color_table("/spiffs/egg_0_color_table",     &egg_0_color_table));
+      ESP_ERROR_CHECK(image_loader_load_color_table("/spiffs/egg_1_color_table",     &egg_1_color_table));
+      ESP_ERROR_CHECK(image_loader_load_color_table("/spiffs/egg_2_color_table",     &egg_2_color_table));
 
 
+      sprite_t egg_0_sprite     = sprite_new(egg_0_image_data, &egg_0_color_table, 64, 64);
+      sprite_t heart_sprite     = sprite_new(heart_image_data, &heart_color_table, 64, 64);
       sprite_t chicken_sprite_0 = sprite_new(chicken_image_data, &chicken_color_table_0, 64, 64);
       sprite_t chicken_sprite_1 = sprite_new(chicken_image_data, &chicken_color_table_1, 64, 64);
-      sprite_t heart_sprite = sprite_new(heart_image_data, &heart_color_table, 64, 64);
+
+      sprite_t egg_1_sprite = sprite_new(egg_1_image_data, &egg_1_color_table, 64, 64);
+      sprite_t egg_2_sprite = sprite_new(egg_2_image_data, &egg_2_color_table, 64, 64);
 
       float previous_elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
       float accum_time = 0.0f;
@@ -84,16 +100,21 @@
       const float fixed_dt = 0.0166f;
       float speed = 20.0f;
 
-      vec2_t chicken_pos_0 = {120.0f, 120.0f};
-      vec2_t chicken_dir_0 = {1.0f, 1.0f};
-      
-      vec2_t chicken_pos_1 = {45.0f, 70.0f};
-      vec2_t chicken_dir_1 = {1.0f, 1.0f};
-      
-      vec2_t heart_pos = {120.0f, 200.0f};
+      sprite_set_position(&chicken_sprite_0, 120.0f, 120.0f);
+      sprite_set_position(&egg_0_sprite, 100.0f, 120.0f);
+      sprite_set_position(&egg_1_sprite, 140.0f, 120.0f);
+      sprite_set_position(&egg_2_sprite, 180.0f, 120.0f);
 
+      chicken_sprite_0.dir_x = 1.0f;
+      chicken_sprite_0.dir_y = 1.0f;
 
-      const int chicken_res = 64;
+      chicken_sprite_1.pos_x = 45.0f;
+      chicken_sprite_1.pos_y = 70.0f;
+      chicken_sprite_1.dir_x = 1.0f;
+      chicken_sprite_1.dir_y = 1.0f;
+      
+      heart_sprite.pos_x = 120.0f;
+      heart_sprite.pos_y = 120.0f;
 
       printf("AVAILABLE MEMORY AFTER IMAGE SETUP: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
@@ -114,6 +135,7 @@
 
       screen_manager_draw(&screen_manager);
 
+      bool screen_needs_update = false;
       
       while (true) 
       {
@@ -133,90 +155,92 @@
 
 
     
-          if(chicken_pos_0.x > 180.0f)
+          if(chicken_sprite_0.pos_x > 180.0f)
           {
-            chicken_dir_0.x = -1.0f;
+            chicken_sprite_0.dir_x = -1.0f;
           }
-          if(chicken_pos_0.x < 60.0f)
+          if(chicken_sprite_0.pos_x < 60.0f)
           {
-            chicken_dir_0.x = 1.0f;
-          }
-
-          if(chicken_pos_0.y > 200.0f)
-          {
-            chicken_dir_0.y = -1.0f;
-          }
-          if(chicken_pos_0.y < 40.0f)
-          {
-            chicken_dir_0.y = 1.0f;
-          }
-          chicken_pos_0.x += fixed_dt * chicken_dir_0.x * speed;
-          chicken_pos_0.y += fixed_dt * chicken_dir_0.y * speed;
-
-
-
-          if(chicken_pos_1.x > 180.0f)
-          {
-            chicken_dir_1.x = -1.0f;
-          }
-          if(chicken_pos_1.x < 60.0f)
-          {
-            chicken_dir_1.x = 1.0f;
+            chicken_sprite_0.dir_x = 1.0f;
           }
 
-          if(chicken_pos_1.y > 200.0f)
+          if(chicken_sprite_0.pos_y > 200.0f)
           {
-            chicken_dir_1.y = -1.0f;
+            chicken_sprite_0.dir_y = -1.0f;
           }
-          if(chicken_pos_1.y < 40.0f)
+          if(chicken_sprite_0.pos_y < 40.0f)
           {
-            chicken_dir_1.y = 1.0f;
+            chicken_sprite_0.dir_y = 1.0f;
           }
-          chicken_pos_1.x += fixed_dt * chicken_dir_1.x * speed;
-          chicken_pos_1.y += fixed_dt * chicken_dir_1.y * speed;
+          chicken_sprite_0.pos_x += fixed_dt * chicken_sprite_0.dir_x * speed;
+          chicken_sprite_0.pos_y += fixed_dt * chicken_sprite_0.dir_y * speed;
+
+
+
+    
+          if(chicken_sprite_1.pos_x > 180.0f)
+          {
+            chicken_sprite_1.dir_x = -1.0f;
+          }
+          if(chicken_sprite_1.pos_x < 60.0f)
+          {
+            chicken_sprite_1.dir_x = 1.0f;
+          }
+
+          if(chicken_sprite_1.pos_y > 200.0f)
+          {
+            chicken_sprite_1.dir_y = -1.0f;
+          }
+          if(chicken_sprite_1.pos_y < 40.0f)
+          {
+            chicken_sprite_1.dir_y = 1.0f;
+          }
+          chicken_sprite_1.pos_x += fixed_dt * chicken_sprite_1.dir_x * speed;
+          chicken_sprite_1.pos_y += fixed_dt * chicken_sprite_1.dir_y * speed;
+
           // printf("time difference %f \n",elapsed_time - ble_manager->timeSinceLastMessageReceived );
           
-          if(screen_manager.busy_transfering == false)
-          {
-            for(int i=0; i< LCD_RES; i++)
-            {
-              screen_manager.full_screen_bitmap[i] = background_color;
-            }
-            if(elapsed_time - ble_manager->timeSinceLastMessageReceived > 10.0f)
-            {
-              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
-            }
-            else
-            {
-              if(chicken_pos_0.y > chicken_pos_1.y)
-              {
-                screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
-                screen_manager_draw_sprite(&screen_manager, &chicken_sprite_1, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
-              }
-              else
-              {
-                screen_manager_draw_sprite(&screen_manager, &chicken_sprite_1, (int)chicken_pos_1.x, (int)chicken_pos_1.y, chicken_res, chicken_dir_1.x < 0.0f);
-                screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0, (int)chicken_pos_0.x, (int)chicken_pos_0.y, chicken_res, chicken_dir_0.x < 0.0f);
-              }
-            }
-            
-            const int heart_x = (int)heart_pos.x;
-            const int heart_y = (int)heart_pos.y;
-            
-            if(elapsed_time - ble_manager->timeSinceLastMessageReceived < 1.0f)
-            {
-              screen_manager_draw_sprite(&screen_manager, &heart_sprite, heart_x, heart_y, chicken_res, false);
-            }
-            if(screen_manager.busy_transfering == false)
-            {
-              printf("draw\n");
-              screen_manager_draw(&screen_manager);
-            }
-          }
+          screen_needs_update = true;  
           
 
           // float delta_measure = (esp_timer_get_time()/1000.0f/1000.0f)-start_measure;
           // printf("update time %f\n", delta_measure);
+        }
+
+        if(screen_needs_update == true && screen_manager.busy_transfering == false)
+        {
+          for(int i=0; i< LCD_RES; i++)
+          {
+            screen_manager.full_screen_bitmap[i] = background_color;
+          }
+
+          if(elapsed_time - ble_manager->timeSinceLastMessageReceived > 10.0f)
+          {
+            screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
+            screen_manager_draw_sprite(&screen_manager, &egg_0_sprite);
+            screen_manager_draw_sprite(&screen_manager, &egg_1_sprite);
+            screen_manager_draw_sprite(&screen_manager, &egg_2_sprite);
+          }
+          else
+          {
+            if(chicken_sprite_0.pos_y > chicken_sprite_1.pos_y)
+            {
+              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
+              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_1);
+            }
+            else
+            {
+              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_1);
+              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
+            }
+          }
+          
+          if(elapsed_time - ble_manager->timeSinceLastMessageReceived < 1.0f)
+          {
+            screen_manager_draw_sprite(&screen_manager, &heart_sprite);
+          }
+          screen_manager_draw(&screen_manager);
+          
         }
         previous_elapsed_time = elapsed_time;
 

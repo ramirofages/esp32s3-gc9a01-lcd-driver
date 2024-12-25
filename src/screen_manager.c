@@ -161,12 +161,15 @@ esp_err_t screen_manager_draw_bitmap_with_color_table(screen_manager_t *screen_m
   return ESP_OK;
 }
 
-esp_err_t screen_manager_draw_sprite(screen_manager_t *screen_manager, sprite_t *sprite, int pos_x, int pos_y, int bitmap_width, bool mirrored)
+esp_err_t screen_manager_draw_sprite(screen_manager_t *screen_manager, sprite_t *sprite)
 {
   screen_manager_draw_bitmap_with_color_table(screen_manager, 
   sprite->bitmap, 
   sprite->color_table->color_array, 
   sprite->color_table->alpha_array,
-  pos_x, pos_y, sprite->width, mirrored);
+  (int)sprite->pos_x,
+  (int)sprite->pos_y,
+  sprite->width,
+  sprite->dir_x < 0.0f);
   return ESP_OK;
 }
