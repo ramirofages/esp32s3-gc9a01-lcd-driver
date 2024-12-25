@@ -19,8 +19,22 @@
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 240
 
+#define SCREEN_MANAGER_TAG "SCREEN_MANAGER"
+
+
+static bool your_callback_function(esp_lcd_panel_io_handle_t io, 
+                              esp_lcd_panel_io_event_data_t *event_data, 
+                              void *user_ctx) {
+    screen_manager_t* screen_manager = (screen_manager_t*)user_ctx;
+    // ESP_EARLY_LOGI(SCREEN_MANAGER_TAG, "asd%d\n\n\n", screen_manager->busy_transfering);
+    screen_manager->busy_transfering = false;
+    return false;
+}
+
 esp_err_t screen_manager_init(screen_manager_t *screen_manager)
 {
+  screen_manager->busy_transfering = false;
+
   spi_bus_config_t buscfg = {
       .mosi_io_num = PIN_NUM_DATA0,
       .sclk_io_num = PIN_NUM_PCLK,
@@ -42,7 +56,8 @@ esp_err_t screen_manager_init(screen_manager_t *screen_manager)
         .lcd_param_bits = 8,
         .spi_mode = 0,
         .trans_queue_depth = 10,
-        
+        .on_color_trans_done = your_callback_function,
+        .user_ctx = screen_manager,
     };
 
     // Attach the LCD to the SPI bus
@@ -86,6 +101,7 @@ esp_err_t screen_manager_init(screen_manager_t *screen_manager)
 
 esp_err_t screen_manager_draw(screen_manager_t *screen_manager)
 {
+    screen_manager->busy_transfering = true;
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(screen_manager->panel_handle, 0, 0, screen_manager->width, screen_manager->height, screen_manager->full_screen_bitmap));
     return ESP_OK;
 }
@@ -152,4 +168,5 @@ esp_err_t screen_manager_draw_sprite(screen_manager_t *screen_manager, sprite_t 
   sprite->color_table->color_array, 
   sprite->color_table->alpha_array,
   pos_x, pos_y, sprite->width, mirrored);
+  return ESP_OK;
 }

@@ -121,20 +121,6 @@ esp_err_t image_loader_load_color_table(const char *filename, color_table_t *col
     return ESP_OK;
 }
 
-sprite_t image_loader_load_sprite(const char *bitmap_filename, const char *color_table_filename, int width, int height)
-{
-  uint8_t *bitmap = NULL;
-  uint16_t *color_table = NULL;
-  uint8_t *alpha_table = NULL;
-
-  ESP_ERROR_CHECK(image_loader_load_image(*bitmap_filename, &bitmap));
-  ESP_ERROR_CHECK(image_loader_load_color_table(*color_table_filename, &color_table, &alpha_table));
-
-  return sprite_new(bitmap, color_table, alpha_table, width, height);
-}
-
-
-
 esp_err_t image_loader_init()
 {
   esp_vfs_spiffs_conf_t conf = {
