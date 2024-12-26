@@ -16,22 +16,9 @@
   #include "screen_manager.h"
   #include "sprite/sprite.h"
   #include "color_table/color_table.h"
+  #include "app/bird/bird.h"
 
   #define LCD_RES 240*240
-
-  typedef struct {
-      float x;
-      float y;
-  } vec2_t;
-
-
-  // Function to create a vec2_t
-  vec2_t create_vec2(float x, float y) {
-      vec2_t v;
-      v.x = x;
-      v.y = y;
-      return v;
-  }
 
   uint16_t rgb888_to_rgb565(uint8_t red, uint8_t green, uint8_t blue) {
       uint16_t r = (red >> 3) & 0x1F;    // 5 bits for red
@@ -98,23 +85,41 @@
 
 
       const float fixed_dt = 0.0166f;
-      float speed = 20.0f;
 
-      sprite_set_position(&chicken_sprite_0, 120.0f, 120.0f);
-      sprite_set_position(&egg_0_sprite, 100.0f, 120.0f);
-      sprite_set_position(&egg_1_sprite, 140.0f, 120.0f);
-      sprite_set_position(&egg_2_sprite, 180.0f, 120.0f);
+      bird_t chicken_0 = bird_new();
+      bird_t chicken_1 = bird_new();
 
-      chicken_sprite_0.dir_x = 1.0f;
-      chicken_sprite_0.dir_y = 1.0f;
 
-      chicken_sprite_1.pos_x = 45.0f;
-      chicken_sprite_1.pos_y = 70.0f;
-      chicken_sprite_1.dir_x = 1.0f;
-      chicken_sprite_1.dir_y = 1.0f;
+      // sprite_set_position(&chicken_sprite_0, 120.0f, 120.0f);
       
-      heart_sprite.pos_x = 120.0f;
-      heart_sprite.pos_y = 120.0f;
+      
+      chicken_0.set_position(120.0f, 120.0f, &chicken_0);
+      chicken_0.direction.x = 1.0f;
+      chicken_0.direction.y = 1.0f;
+      chicken_0.speed = 20.0f;
+
+      chicken_1.set_position(45.0f, 70.0f, &chicken_0);
+      chicken_1.direction.x = 1.0f;
+      chicken_1.direction.y = 1.0f;
+      chicken_1.speed = 20.0f;
+
+      sprite_set_position(100.0f, 120.0f, &egg_0_sprite);
+      sprite_set_position(140.0f, 120.0f, &egg_1_sprite);
+      sprite_set_position(180.0f, 120.0f, &egg_2_sprite);
+
+      // chicken_sprite_0.dir_x = 1.0f;
+      // chicken_sprite_0.dir_y = 1.0f;
+
+      // chicken_sprite_1.pos_x = 45.0f;
+      // chicken_sprite_1.pos_y = 70.0f;
+      // chicken_sprite_1.dir_x = 1.0f;
+      // chicken_sprite_1.dir_y = 1.0f;
+
+      sprite_set_position(120.0f, 200.0f, &heart_sprite);
+
+      
+      // heart_sprite.pos_x = 120.0f;
+      // heart_sprite.pos_y = 120.0f;
 
       printf("AVAILABLE MEMORY AFTER IMAGE SETUP: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
@@ -153,50 +158,51 @@
           animation_time += fixed_dt;
 
 
+          chicken_0.update(fixed_dt, &chicken_0);
+          chicken_1.update(fixed_dt, &chicken_1);
+    
+          // if(chicken_sprite_0.pos_x > 180.0f)
+          // {
+          //   chicken_sprite_0.dir_x = -1.0f;
+          // }
+          // if(chicken_sprite_0.pos_x < 60.0f)
+          // {
+          //   chicken_sprite_0.dir_x = 1.0f;
+          // }
+
+          // if(chicken_sprite_0.pos_y > 200.0f)
+          // {
+          //   chicken_sprite_0.dir_y = -1.0f;
+          // }
+          // if(chicken_sprite_0.pos_y < 40.0f)
+          // {
+          //   chicken_sprite_0.dir_y = 1.0f;
+          // }
+          // chicken_sprite_0.pos_x += fixed_dt * chicken_sprite_0.dir_x * speed;
+          // chicken_sprite_0.pos_y += fixed_dt * chicken_sprite_0.dir_y * speed;
+
+
 
     
-          if(chicken_sprite_0.pos_x > 180.0f)
-          {
-            chicken_sprite_0.dir_x = -1.0f;
-          }
-          if(chicken_sprite_0.pos_x < 60.0f)
-          {
-            chicken_sprite_0.dir_x = 1.0f;
-          }
+          // if(chicken_sprite_1.pos_x > 180.0f)
+          // {
+          //   chicken_sprite_1.dir_x = -1.0f;
+          // }
+          // if(chicken_sprite_1.pos_x < 60.0f)
+          // {
+          //   chicken_sprite_1.dir_x = 1.0f;
+          // }
 
-          if(chicken_sprite_0.pos_y > 200.0f)
-          {
-            chicken_sprite_0.dir_y = -1.0f;
-          }
-          if(chicken_sprite_0.pos_y < 40.0f)
-          {
-            chicken_sprite_0.dir_y = 1.0f;
-          }
-          chicken_sprite_0.pos_x += fixed_dt * chicken_sprite_0.dir_x * speed;
-          chicken_sprite_0.pos_y += fixed_dt * chicken_sprite_0.dir_y * speed;
-
-
-
-    
-          if(chicken_sprite_1.pos_x > 180.0f)
-          {
-            chicken_sprite_1.dir_x = -1.0f;
-          }
-          if(chicken_sprite_1.pos_x < 60.0f)
-          {
-            chicken_sprite_1.dir_x = 1.0f;
-          }
-
-          if(chicken_sprite_1.pos_y > 200.0f)
-          {
-            chicken_sprite_1.dir_y = -1.0f;
-          }
-          if(chicken_sprite_1.pos_y < 40.0f)
-          {
-            chicken_sprite_1.dir_y = 1.0f;
-          }
-          chicken_sprite_1.pos_x += fixed_dt * chicken_sprite_1.dir_x * speed;
-          chicken_sprite_1.pos_y += fixed_dt * chicken_sprite_1.dir_y * speed;
+          // if(chicken_sprite_1.pos_y > 200.0f)
+          // {
+          //   chicken_sprite_1.dir_y = -1.0f;
+          // }
+          // if(chicken_sprite_1.pos_y < 40.0f)
+          // {
+          //   chicken_sprite_1.dir_y = 1.0f;
+          // }
+          // chicken_sprite_1.pos_x += fixed_dt * chicken_sprite_1.dir_x * speed;
+          // chicken_sprite_1.pos_y += fixed_dt * chicken_sprite_1.dir_y * speed;
 
           // printf("time difference %f \n",elapsed_time - ble_manager->timeSinceLastMessageReceived );
           
@@ -209,6 +215,14 @@
 
         if(screen_needs_update == true && screen_manager.busy_transfering == false)
         {
+          chicken_sprite_0.position.x = chicken_0.position.x;
+          chicken_sprite_0.position.y = chicken_0.position.y;
+          chicken_sprite_0.mirrored = chicken_0.direction.x < 0.0f;
+
+          chicken_sprite_1.position.x = chicken_1.position.x;
+          chicken_sprite_1.position.y = chicken_1.position.y;
+          chicken_sprite_1.mirrored   = chicken_1.direction.x < 0.0f;
+
           for(int i=0; i< LCD_RES; i++)
           {
             screen_manager.full_screen_bitmap[i] = background_color;
@@ -223,7 +237,7 @@
           }
           else
           {
-            if(chicken_sprite_0.pos_y > chicken_sprite_1.pos_y)
+            if(chicken_sprite_0.position.y > chicken_sprite_1.position.y)
             {
               screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
               screen_manager_draw_sprite(&screen_manager, &chicken_sprite_1);

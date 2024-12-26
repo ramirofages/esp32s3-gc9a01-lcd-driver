@@ -167,9 +167,9 @@ esp_err_t screen_manager_draw_sprite(screen_manager_t *screen_manager, sprite_t 
   sprite->bitmap, 
   sprite->color_table->color_array, 
   sprite->color_table->alpha_array,
-  (int)sprite->pos_x,
-  (int)sprite->pos_y,
+  (int)sprite->position.x,
+  (int)sprite->position.y,
   sprite->width,
-  sprite->dir_x < 0.0f);
+  sprite->mirrored);
   return ESP_OK;
 }
