@@ -40,7 +40,15 @@
 
       screen_manager_t screen_manager;
       screen_manager_init(&screen_manager);
+      
+      uint16_t background_color = rgb888_to_rgb565(powf(14.0f/255.0f, 0.4545f)*255,powf(63.0f/255.0f, 0.4545f)*255,powf(27.0f/255.0f, 0.4545f)*255);
+      background_color = (background_color >> 8) | ((background_color & 0xFF) << 8);
 
+      for(int i=0; i< LCD_RES; i++)
+      {
+        screen_manager.full_screen_bitmap[i] = background_color;
+      }
+      screen_manager_draw(&screen_manager);
 
       uint8_t *chicken_image_data = NULL;
       uint8_t *egg_0_image_data = NULL;
@@ -111,9 +119,6 @@
 
       printf("TIME SINCE LAST RECEIVED %f\n", ble_manager->timeSinceLastMessageReceived);
       printf("AVAILABLE MEMORY AFTER NIMBLE SETUP: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
-      uint16_t background_color = rgb888_to_rgb565(powf(14.0f/255.0f, 0.4545f)*255,powf(63.0f/255.0f, 0.4545f)*255,powf(27.0f/255.0f, 0.4545f)*255);
-      background_color = (background_color >> 8) | ((background_color & 0xFF) << 8);
-
 
       for(int i=0; i< LCD_RES; i++)
       {
