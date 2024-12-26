@@ -17,5 +17,5 @@ sprite_t sprite_new(uint8_t *bitmap, color_table_t *color_table, int width, int 
 void sprite_set_position(float x, float y, sprite_t *sprite)
 {
   sprite->position.x = x;
-  sprite->position.y = x;
+  sprite->position.y = y;
 }

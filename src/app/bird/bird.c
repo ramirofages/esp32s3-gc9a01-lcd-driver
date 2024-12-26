@@ -1,17 +1,19 @@
 #include "bird.h"
-
+#include <stdio.h>
 
 static void update(float delta_time, bird_t *self)
 {
   self->elapsed_seconds_accumulator += delta_time;
 
-  
   if(self->elapsed_seconds_accumulator-0.00001f > 1.0f)
   {
     self->elapsed_seconds++;
-    if(self->elapsed_seconds > 4 && self->growth_state < self->max_growth_states)
+    self->elapsed_seconds_accumulator -= 1.0f;
+    if(self->elapsed_seconds > 4*(self->growth_state+1) && 
+       self->growth_state < self->max_growth_states)
     {
       self->growth_state++;
+      printf("GROW TO %d\n", self->growth_state);
     }
   }
 

@@ -90,36 +90,18 @@
       bird_t chicken_1 = bird_new();
 
 
-      // sprite_set_position(&chicken_sprite_0, 120.0f, 120.0f);
-      
-      
       chicken_0.set_position(120.0f, 120.0f, &chicken_0);
       chicken_0.direction.x = 1.0f;
       chicken_0.direction.y = 1.0f;
       chicken_0.speed = 20.0f;
 
-      chicken_1.set_position(45.0f, 70.0f, &chicken_0);
+      chicken_1.set_position(45.0f, 70.0f, &chicken_1);
       chicken_1.direction.x = 1.0f;
       chicken_1.direction.y = 1.0f;
       chicken_1.speed = 20.0f;
 
-      sprite_set_position(100.0f, 120.0f, &egg_0_sprite);
-      sprite_set_position(140.0f, 120.0f, &egg_1_sprite);
-      sprite_set_position(180.0f, 120.0f, &egg_2_sprite);
-
-      // chicken_sprite_0.dir_x = 1.0f;
-      // chicken_sprite_0.dir_y = 1.0f;
-
-      // chicken_sprite_1.pos_x = 45.0f;
-      // chicken_sprite_1.pos_y = 70.0f;
-      // chicken_sprite_1.dir_x = 1.0f;
-      // chicken_sprite_1.dir_y = 1.0f;
-
       sprite_set_position(120.0f, 200.0f, &heart_sprite);
 
-      
-      // heart_sprite.pos_x = 120.0f;
-      // heart_sprite.pos_y = 120.0f;
 
       printf("AVAILABLE MEMORY AFTER IMAGE SETUP: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
 
@@ -148,8 +130,6 @@
         float delta_time = elapsed_time - previous_elapsed_time;
         accum_time += delta_time;
         // printf("update: %f \n", delta_time);
-        // printf("Is transfering data: %s\n", screen_manager.busy_transfering ? "true" : "false");
-        // printf("Is transfering data: %s\n", screen_manager.busy_transfering? "true":"false");
 
         if(accum_time > fixed_dt)
         {
@@ -159,50 +139,8 @@
 
 
           chicken_0.update(fixed_dt, &chicken_0);
-          chicken_1.update(fixed_dt, &chicken_1);
+          // chicken_1.update(fixed_dt, &chicken_1);
     
-          // if(chicken_sprite_0.pos_x > 180.0f)
-          // {
-          //   chicken_sprite_0.dir_x = -1.0f;
-          // }
-          // if(chicken_sprite_0.pos_x < 60.0f)
-          // {
-          //   chicken_sprite_0.dir_x = 1.0f;
-          // }
-
-          // if(chicken_sprite_0.pos_y > 200.0f)
-          // {
-          //   chicken_sprite_0.dir_y = -1.0f;
-          // }
-          // if(chicken_sprite_0.pos_y < 40.0f)
-          // {
-          //   chicken_sprite_0.dir_y = 1.0f;
-          // }
-          // chicken_sprite_0.pos_x += fixed_dt * chicken_sprite_0.dir_x * speed;
-          // chicken_sprite_0.pos_y += fixed_dt * chicken_sprite_0.dir_y * speed;
-
-
-
-    
-          // if(chicken_sprite_1.pos_x > 180.0f)
-          // {
-          //   chicken_sprite_1.dir_x = -1.0f;
-          // }
-          // if(chicken_sprite_1.pos_x < 60.0f)
-          // {
-          //   chicken_sprite_1.dir_x = 1.0f;
-          // }
-
-          // if(chicken_sprite_1.pos_y > 200.0f)
-          // {
-          //   chicken_sprite_1.dir_y = -1.0f;
-          // }
-          // if(chicken_sprite_1.pos_y < 40.0f)
-          // {
-          //   chicken_sprite_1.dir_y = 1.0f;
-          // }
-          // chicken_sprite_1.pos_x += fixed_dt * chicken_sprite_1.dir_x * speed;
-          // chicken_sprite_1.pos_y += fixed_dt * chicken_sprite_1.dir_y * speed;
 
           // printf("time difference %f \n",elapsed_time - ble_manager->timeSinceLastMessageReceived );
           
@@ -223,6 +161,15 @@
           chicken_sprite_1.position.y = chicken_1.position.y;
           chicken_sprite_1.mirrored   = chicken_1.direction.x < 0.0f;
 
+          egg_0_sprite.position.x = chicken_sprite_0.position.x;
+          egg_0_sprite.position.y = chicken_sprite_0.position.y;
+
+          egg_1_sprite.position.x = chicken_sprite_0.position.x;
+          egg_1_sprite.position.y = chicken_sprite_0.position.y;
+
+          egg_2_sprite.position.x = chicken_sprite_0.position.x;
+          egg_2_sprite.position.y = chicken_sprite_0.position.y;
+
           for(int i=0; i< LCD_RES; i++)
           {
             screen_manager.full_screen_bitmap[i] = background_color;
@@ -230,10 +177,25 @@
 
           if(elapsed_time - ble_manager->timeSinceLastMessageReceived > 10.0f)
           {
-            screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
-            screen_manager_draw_sprite(&screen_manager, &egg_0_sprite);
-            screen_manager_draw_sprite(&screen_manager, &egg_1_sprite);
-            screen_manager_draw_sprite(&screen_manager, &egg_2_sprite);
+            if(chicken_0.growth_state == 0)
+            {
+              screen_manager_draw_sprite(&screen_manager, &egg_0_sprite);
+            }
+            if(chicken_0.growth_state == 1)
+            {
+              screen_manager_draw_sprite(&screen_manager, &egg_1_sprite);
+            }
+            if(chicken_0.growth_state == 2)
+            {
+              screen_manager_draw_sprite(&screen_manager, &egg_2_sprite);
+            }
+            if(chicken_0.growth_state == 3)
+            {
+              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
+            }
+            // screen_manager_draw_sprite(&screen_manager, &egg_0_sprite);
+            // screen_manager_draw_sprite(&screen_manager, &egg_1_sprite);
+            // screen_manager_draw_sprite(&screen_manager, &egg_2_sprite);
           }
           else
           {
