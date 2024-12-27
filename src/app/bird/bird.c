@@ -13,7 +13,7 @@ static void update(float delta_time, bird_t *self)
        self->growth_state < self->max_growth_states)
     {
       self->growth_state++;
-      printf("GROW TO %d\n", self->growth_state);
+      // printf("GROW TO %d\n", self->growth_state);
     }
   }
 
@@ -30,12 +30,12 @@ static void update(float delta_time, bird_t *self)
   {
     self->direction.y = -1.0f;
   }
-  if(self->position.y < 40.0f)
+  if(self->position.y < 5.0f)
   {
     self->direction.y = 1.0f;
   }
 
-  if(self->growth_state == 3)
+  if(self->growth_state >= 2)
   {
     self->position.x += delta_time * self->direction.x * self->speed;
     self->position.y += delta_time * self->direction.y * self->speed;

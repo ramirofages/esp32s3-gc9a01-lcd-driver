@@ -78,12 +78,25 @@
 
 
       sprite_t egg_0_sprite     = sprite_new(egg_0_image_data, &egg_0_color_table, 64, 64);
+      sprite_t egg_1_sprite     = sprite_new(egg_1_image_data, &egg_1_color_table, 64, 64);
+      sprite_t egg_2_sprite     = sprite_new(egg_2_image_data, &egg_2_color_table, 64, 64);
       sprite_t heart_sprite     = sprite_new(heart_image_data, &heart_color_table, 64, 64);
       sprite_t chicken_sprite_0 = sprite_new(chicken_image_data, &chicken_color_table_0, 64, 64);
       sprite_t chicken_sprite_1 = sprite_new(chicken_image_data, &chicken_color_table_1, 64, 64);
 
-      sprite_t egg_1_sprite = sprite_new(egg_1_image_data, &egg_1_color_table, 64, 64);
-      sprite_t egg_2_sprite = sprite_new(egg_2_image_data, &egg_2_color_table, 64, 64);
+
+      sprite_t *chicken_0_sprite_states[4] = {
+        &egg_0_sprite,
+        &egg_1_sprite,
+        &egg_2_sprite,
+        &chicken_sprite_0
+      }; 
+      sprite_t *chicken_1_sprite_states[4] = {
+        &egg_0_sprite,
+        &egg_1_sprite,
+        &egg_2_sprite,
+        &chicken_sprite_1
+      }; 
 
       float previous_elapsed_time = esp_timer_get_time()/1000.0f/1000.0f;
       float accum_time = 0.0f;
@@ -107,8 +120,9 @@
       chicken_1.direction.x = 1.0f;
       chicken_1.direction.y = 1.0f;
       chicken_1.speed = 20.0f;
+      chicken_1.growth_state = 3;
 
-      sprite_set_position(120.0f, 200.0f, &heart_sprite);
+      sprite_set_position(120.0f, 180.0f, &heart_sprite);
 
 
       printf("AVAILABLE MEMORY AFTER IMAGE SETUP: %d \n\n", heap_caps_get_free_size(MALLOC_CAP_DMA));
@@ -144,7 +158,7 @@
 
 
           chicken_0.update(fixed_dt, &chicken_0);
-          // chicken_1.update(fixed_dt, &chicken_1);
+          chicken_1.update(fixed_dt, &chicken_1);
     
 
           // printf("time difference %f \n",elapsed_time - ble_manager->timeSinceLastMessageReceived );
@@ -174,7 +188,8 @@
 
           egg_2_sprite.position.x = chicken_sprite_0.position.x;
           egg_2_sprite.position.y = chicken_sprite_0.position.y;
-
+          egg_2_sprite.mirrored = chicken_sprite_0.mirrored;
+          
           for(int i=0; i< LCD_RES; i++)
           {
             screen_manager.full_screen_bitmap[i] = background_color;
@@ -182,37 +197,26 @@
 
           if(elapsed_time - ble_manager->timeSinceLastMessageReceived > 10.0f)
           {
-            if(chicken_0.growth_state == 0)
-            {
-              screen_manager_draw_sprite(&screen_manager, &egg_0_sprite);
-            }
-            if(chicken_0.growth_state == 1)
-            {
-              screen_manager_draw_sprite(&screen_manager, &egg_1_sprite);
-            }
-            if(chicken_0.growth_state == 2)
-            {
-              screen_manager_draw_sprite(&screen_manager, &egg_2_sprite);
-            }
-            if(chicken_0.growth_state == 3)
-            {
-              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
-            }
-            // screen_manager_draw_sprite(&screen_manager, &egg_0_sprite);
-            // screen_manager_draw_sprite(&screen_manager, &egg_1_sprite);
-            // screen_manager_draw_sprite(&screen_manager, &egg_2_sprite);
+            screen_manager_draw_sprite(&screen_manager, chicken_0_sprite_states[chicken_0.growth_state]);
+
           }
           else
           {
             if(chicken_sprite_0.position.y > chicken_sprite_1.position.y)
             {
-              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
-              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_1);
+              screen_manager_draw_sprite(&screen_manager, chicken_0_sprite_states[chicken_0.growth_state]);
+              screen_manager_draw_sprite(&screen_manager, chicken_1_sprite_states[chicken_1.growth_state]);
+
+              // screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
+              // screen_manager_draw_sprite(&screen_manager, &chicken_sprite_1);
             }
             else
             {
-              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_1);
-              screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
+              screen_manager_draw_sprite(&screen_manager, chicken_1_sprite_states[chicken_1.growth_state]);
+              screen_manager_draw_sprite(&screen_manager, chicken_0_sprite_states[chicken_0.growth_state]);
+
+              // screen_manager_draw_sprite(&screen_manager, &chicken_sprite_1);
+              // screen_manager_draw_sprite(&screen_manager, &chicken_sprite_0);
             }
           }
           
